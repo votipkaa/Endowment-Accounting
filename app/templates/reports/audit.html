@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Home</a></li>
+  <li class="breadcrumb-item active">Audit Log</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header"><h2><i class="bi bi-shield-check me-2"></i>Audit Log</h2>
+<p class="text-muted mb-0">Complete record of all system actions with user attribution</p></div>
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Timestamp</th><th>User</th><th>Action</th><th>Record Type</th><th>Description</th><th>IP</th></tr>
+      </thead>
+      <tbody>
+        {% for log in logs.items %}
+        <tr>
+          <td class="small text-muted">{{ log.timestamp.strftime("%m/%d/%Y %H:%M:%S") }}</td>
+          <td class="fw-semibold">{{ log.user.username if log.user else '—' }}</td>
+          <td>
+            <span class="badge rounded-pill
+              {% if log.action.value == 'create' %}bg-success
+              {% elif log.action.value == 'update' %}bg-primary
+              {% elif log.action.value == 'void' %}bg-danger
+              {% elif log.action.value == 'approve' %}bg-warning text-dark
+              {% else %}bg-secondary{% endif %}">
+              {{ log.action.value }}
+            </span>
+          </td>
+          <td class="small">{{ log.entity_type or '—' }}</td>
+          <td class="small">{{ log.description or '—' }}</td>
+          <td class="small text-muted">{{ log.ip_address or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-muted text-center py-4">No audit entries yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if logs.pages > 1 %}
+  <div class="card-footer">
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        {% for p in logs.iter_pages() %}
+          {% if p %}
+            <li class="page-item {% if p == logs.page %}active{% endif %}">
+              <a class="page-link" href="?page={{ p }}{% if entity_filter %}&entity={{ entity_filter }}{% endif %}">{{ p }}</a>
+            </li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

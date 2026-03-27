@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Sign In — Endowment Manager{% endblock %}
+{% block auth_content %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center" style="background: linear-gradient(135deg, #1e3a5f 0%, #2a5298 100%);">
+  <div style="width: 400px;">
+    <div class="text-center mb-4">
+      <i class="bi bi-bank2 text-white" style="font-size: 2.5rem;"></i>
+      <h3 class="text-white mt-2 fw-bold">Endowment Manager</h3>
+      <p class="text-white-50">Fund Accounting System</p>
+    </div>
+    <div class="card p-4 shadow-lg">
+      <h5 class="fw-bold mb-4 text-center" style="color: #1e3a5f;">Sign In</h5>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+      <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+          {{ form.username.label(class="form-label") }}
+          {{ form.username(class="form-control", placeholder="Username") }}
+        </div>
+        <div class="mb-3">
+          {{ form.password.label(class="form-label") }}
+          {{ form.password(class="form-control", placeholder="Password") }}
+        </div>
+        <div class="mb-3 form-check">
+          {{ form.remember(class="form-check-input") }}
+          <label class="form-check-label text-muted">Remember me</label>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-box-arrow-in-right"></i> Sign In
+        </button>
+      </form>
+    </div>
+    <p class="text-center mt-3 text-white-50" style="font-size:.75rem;">
+      Restricted access — authorized users only.
+    </p>
+  </div>
+</div>
+{% endblock %}

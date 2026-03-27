@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}{{ vehicle.name }} — Vehicle Detail{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.index') }}">Pools</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.detail', pool_id=pool.id) }}">{{ pool.name }}</a></li>
+  <li class="breadcrumb-item active">{{ vehicle.name }}</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-start">
+  <div>
+    <h2><i class="bi bi-briefcase me-2"></i>{{ vehicle.name }}</h2>
+    <p class="text-muted mb-0">
+      <i class="bi bi-layers me-1"></i>{{ pool.name }}
+      {% if vehicle.description %} &mdash; {{ vehicle.description }}{% endif %}
+    </p>
+  </div>
+  {% if current_user.can_edit %}
+  <a href="{{ url_for('pools.activity_list', pool_id=pool.id) }}" class="btn btn-outline-primary">
+    <i class="bi bi-pencil-square me-1"></i> Enter Activity
+  </a>
+  {% endif %}
+</div>
+
+<!-- ── Reconciliation Helper ── -->
+<div class="row g-3 mb-4">
+  {% if last_closed_row %}
+  {% set lc = last_closed_row %}
+  {% set lc_act = lc.act %}
+  <div class="col-md-4">
+    <div class="stat-card success">
+      <div class="label">Last Closed Month Ending Balance</div>
+      <div class="value text-money">${{ "{:,.2f}".format(lc_act.ending_balance or 0) }}</div>
+      <div class="sub">{{ "%04d-%02d"|format(lc_act.year, lc_act.month) }} — match this to your statement</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card accent">
+      <div class="label">Cumulative Unrealized Gains Through {{ "%04d-%02d"|format(lc_act.year, lc_act.month) }}</div>
+      <div class="value text-money {% if lc.cum_unrealized < 0 %}text-danger{% endif %}">
+        {{ "+" if lc.cum_unrealized >= 0 }}${{ "{:,.2f}".format(lc.cum_unrealized) }}
+      </div>
+      <div class="sub">Running total of all unrealized G/L entered</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="label">Cumulative Realized Gains Through {{ "%04d-%02d"|format(lc_act.year, lc_act.month) }}</div>
+      <div class="value text-money {% if lc.cum_realized < 0 %}text-danger{% endif %}">
+        {{ "+" if lc.cum_realized >= 0 }}${{ "{:,.2f}".format(lc.cum_realized) }}
+      </div>
+      <div class="sub">Running total of all realized G/L entered</div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-1"></i>
+      No closed months yet for this vehicle. Enter and approve activity, then close the month to see reconciliation data.
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── Brokerage Statement Reconciliation Guide ── -->
+{% if last_closed_row %}
+<div class="card mb-4">
+  <div class="card-header">
+    <h6><i class="bi bi-receipt me-2"></i>Brokerage Statement Reconciliation Helper</h6>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="p-3 rounded" style="background:#f0fdf4; border:1px solid #bbf7d0;">
+          <h6 class="text-success mb-2"><i class="bi bi-check2-circle me-1"></i>Statement shows <strong>CHANGE</strong> in unrealized gains</h6>
+          <p class="mb-0 small">Your statement shows something like "Net change in unrealized gain/loss: <em>$X</em>" for the month. Enter that amount directly in the <strong>Unrealized Gains (Losses)</strong> field when recording activity.</p>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="p-3 rounded" style="background:#eff6ff; border:1px solid #bfdbfe;">
+          <h6 class="text-primary mb-2"><i class="bi bi-calculator me-1"></i>Statement shows <strong>TOTAL</strong> unrealized position</h6>
+          <p class="mb-2 small">Your statement shows total unrealized gains/losses as of month-end (e.g., "Unrealized gain: <em>$Y</em>"). Calculate the change to enter:</p>
+          <div class="font-monospace small p-2 rounded" style="background:#dbeafe;">
+            This month's entry = Statement total &minus; Cumulative through last closed month<br>
+            = Statement total &minus; <strong>${{ "{:,.2f}".format(last_closed_row.cum_unrealized) }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Chart ── -->
+{% if chart_labels %}
+<div class="card mb-4">
+  <div class="card-header"><h6><i class="bi bi-graph-up me-2"></i>Ending Balance Over Time</h6></div>
+  <div class="card-body">
+    <canvas id="vehicleChart" height="90"></canvas>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Full Activity History ── -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6><i class="bi bi-table me-2"></i>Complete Activity History
+      <span class="badge bg-secondary rounded-pill ms-1">{{ rows|length }} months</span>
+    </h6>
+    <span class="text-muted small">Newest first &bull; Cumulative columns sum all months through each period</span>
+  </div>
+  <div class="card-body p-0" style="overflow-x:auto">
+    <table class="table table-hover mb-0" style="min-width:1100px">
+      <thead class="table-light">
+        <tr>
+          <th>Period</th>
+          <th class="text-end">Beg. Balance</th>
+          <th class="text-end">Mgmt Exp.</th>
+          <th class="text-end">Interest / Div.</th>
+          <th class="text-end">Unrealized G/L<br><small class="text-muted fw-normal">this month</small></th>
+          <th class="text-end">Realized G/L<br><small class="text-muted fw-normal">this month</small></th>
+          <th class="text-end fw-bold">End. Balance</th>
+          <th class="text-end" style="border-left:2px solid #e2e8f0">Cum. Unrealized</th>
+          <th class="text-end">Cum. Realized</th>
+          <th class="text-end">Cum. Net Activity</th>
+          <th class="text-center">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set act = row.act %}
+        <tr class="{% if row.is_closed %}{% else %}table-warning{% endif %}">
+          <td class="fw-semibold">
+            <a href="{{ url_for('pools.activity_list', pool_id=pool.id, year=act.year, month=act.month) }}"
+               class="text-decoration-none">{{ "%04d-%02d"|format(act.year, act.month) }}</a>
+          </td>
+          <td class="text-end text-money">${{ "{:,.2f}".format(act.beginning_balance or 0) }}</td>
+          <td class="text-end text-money text-danger">${{ "{:,.2f}".format(act.management_expenses or 0) }}</td>
+          <td class="text-end text-money text-success">${{ "{:,.2f}".format(act.interest_dividends or 0) }}</td>
+          <td class="text-end text-money {% if (act.unrealized_gains or 0) < 0 %}text-danger{% elif (act.unrealized_gains or 0) > 0 %}text-success{% endif %}">
+            {{ "+" if (act.unrealized_gains or 0) > 0 }}${{ "{:,.2f}".format(act.unrealized_gains or 0) }}
+          </td>
+          <td class="text-end text-money {% if (act.realized_gains or 0) < 0 %}text-danger{% elif (act.realized_gains or 0) > 0 %}text-success{% endif %}">
+            {{ "+" if (act.realized_gains or 0) > 0 }}${{ "{:,.2f}".format(act.realized_gains or 0) }}
+          </td>
+          <td class="text-end text-money fw-bold">${{ "{:,.2f}".format(act.ending_balance or 0) }}</td>
+          <!-- Cumulative columns -->
+          <td class="text-end text-money {% if row.cum_unrealized < 0 %}text-danger{% endif %}" style="border-left:2px solid #e2e8f0">
+            {{ "+" if row.cum_unrealized > 0 }}${{ "{:,.2f}".format(row.cum_unrealized) }}
+          </td>
+          <td class="text-end text-money {% if row.cum_realized < 0 %}text-danger{% endif %}">
+            {{ "+" if row.cum_realized > 0 }}${{ "{:,.2f}".format(row.cum_realized) }}
+          </td>
+          <td class="text-end text-money {% if row.cum_net_activity < 0 %}text-danger{% elif row.cum_net_activity > 0 %}text-success{% endif %}">
+            {{ "+" if row.cum_net_activity > 0 }}${{ "{:,.2f}".format(row.cum_net_activity) }}
+          </td>
+          <td class="text-center">
+            {% if act.is_approved and row.is_closed %}
+              <span class="badge bg-success rounded-pill">Closed</span>
+            {% elif act.is_approved %}
+              <span class="badge bg-info rounded-pill">Approved</span>
+            {% else %}
+              <span class="badge bg-warning text-dark rounded-pill">Pending</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% if act.notes %}
+        <tr class="table-light">
+          <td colspan="11" class="py-1 px-4 text-muted small fst-italic">
+            <i class="bi bi-chat-left-text me-1"></i>{{ act.notes }}
+          </td>
+        </tr>
+        {% endif %}
+        {% else %}
+        <tr>
+          <td colspan="11" class="text-muted text-center py-4">
+            No activity recorded yet for this vehicle.
+            {% if current_user.can_edit %}
+            <a href="{{ url_for('pools.activity_list', pool_id=pool.id) }}">Enter activity.</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if rows %}
+      {% set last = rows[-1] %}  {# last in display = oldest; but we want grand totals which are from oldest rows #}
+      {% set first_row = rows[0] %}  {# newest row has the running totals we want for grand total #}
+      <tfoot class="table-light fw-bold">
+        <tr style="border-top:2px solid #94a3b8">
+          <td>LIFETIME TOTAL</td>
+          <td class="text-end text-money">—</td>
+          <td class="text-end text-money text-danger">
+            ${{ "{:,.2f}".format(first_row.cum_expenses) }}
+          </td>
+          <td class="text-end text-money text-success">
+            ${{ "{:,.2f}".format(first_row.cum_interest) }}
+          </td>
+          <td class="text-end text-money {% if first_row.cum_unrealized < 0 %}text-danger{% endif %}">
+            {{ "+" if first_row.cum_unrealized > 0 }}${{ "{:,.2f}".format(first_row.cum_unrealized) }}
+          </td>
+          <td class="text-end text-money {% if first_row.cum_realized < 0 %}text-danger{% endif %}">
+            {{ "+" if first_row.cum_realized > 0 }}${{ "{:,.2f}".format(first_row.cum_realized) }}
+          </td>
+          <td class="text-end text-money">—</td>
+          <td class="text-end text-money {% if first_row.cum_unrealized < 0 %}text-danger{% endif %}" style="border-left:2px solid #e2e8f0">
+            {{ "+" if first_row.cum_unrealized > 0 }}${{ "{:,.2f}".format(first_row.cum_unrealized) }}
+          </td>
+          <td class="text-end text-money {% if first_row.cum_realized < 0 %}text-danger{% endif %}">
+            {{ "+" if first_row.cum_realized > 0 }}${{ "{:,.2f}".format(first_row.cum_realized) }}
+          </td>
+          <td class="text-end text-money {% if first_row.cum_net_activity < 0 %}text-danger{% elif first_row.cum_net_activity > 0 %}text-success{% endif %}">
+            {{ "+" if first_row.cum_net_activity > 0 }}${{ "{:,.2f}".format(first_row.cum_net_activity) }}
+          </td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if chart_labels %}
+<script>
+const ctx = document.getElementById('vehicleChart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: {{ chart_labels | tojson }},
+    datasets: [
+      {
+        label: 'Ending Balance',
+        data: {{ chart_ending | tojson }},
+        borderColor: '#2a5298',
+        backgroundColor: 'rgba(42,82,152,0.08)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        yAxisID: 'y',
+      },
+      {
+        label: 'Cumulative Unrealized G/L',
+        data: {{ chart_unrealized_cum | tojson }},
+        borderColor: '#e8a020',
+        borderDash: [6, 3],
+        fill: false,
+        tension: 0.3,
+        pointRadius: 3,
+        yAxisID: 'y',
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      y: {
+        ticks: {
+          callback: v => '$' + v.toLocaleString('en-US', {minimumFractionDigits: 0})
+        }
+      }
+    }
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

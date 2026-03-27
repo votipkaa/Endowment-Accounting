@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}User Management{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <h2><i class="bi bi-people me-2"></i>User Management</h2>
+  <a href="{{ url_for('admin.new_user') }}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i> New User</a>
+</div>
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td class="fw-semibold">{{ u.username }}</td>
+          <td>{{ u.email }}</td>
+          <td>
+            <span class="badge rounded-pill
+              {% if u.role == UserRole.ADMIN %}bg-danger
+              {% elif u.role == UserRole.DATA_ENTRY %}bg-primary
+              {% elif u.role == UserRole.REPORTING %}bg-info text-dark
+              {% else %}bg-secondary{% endif %}">
+              {{ u.role.value.replace('_', ' ').title() }}
+            </span>
+          </td>
+          <td>
+            {% if u.is_active %}<span class="badge bg-success rounded-pill">Active</span>
+            {% else %}<span class="badge bg-secondary rounded-pill">Inactive</span>{% endif %}
+          </td>
+          <td class="small text-muted">{{ u.last_login.strftime("%m/%d/%Y %H:%M") if u.last_login else 'Never' }}</td>
+          <td><a href="{{ url_for('admin.edit_user', user_id=u.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

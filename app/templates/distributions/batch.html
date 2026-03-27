@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Batch Distribution{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('distributions.index') }}">Distributions</a></li>
+  <li class="breadcrumb-item active">Batch Distribution</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Batch Distribution</h2>
+  <p class="text-muted mb-0">Record distributions across multiple funds at once. Leave amount blank to skip a fund.</p>
+</div>
+
+<form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="section-card mb-4">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label fw-bold">Distribution Date</label>
+        <input type="date" name="distribution_date" class="form-control" required
+               value="{{ now.strftime('%Y-%m-%d') }}">
+      </div>
+      <div class="col-md-8">
+        <label class="form-label fw-bold">Purpose (applies to all)</label>
+        <input type="text" name="purpose" class="form-control" placeholder="e.g. Annual scholarship distributions Q1 2025">
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><h6><i class="bi bi-table me-2"></i>Fund Amounts</h6></div>
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Fund</th>
+            <th>Restriction</th>
+            <th class="text-end">Current Value</th>
+            <th class="text-end">Corpus</th>
+            <th class="text-end">Suggested ({{ "%.0f"|format(5) }}%)</th>
+            <th class="text-center">Status</th>
+            <th style="width:160px">Distribution Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fund in funds %}
+          <tr class="{% if fund.is_underwater and not fund.allow_underwater_spend %}table-danger{% elif fund.is_underwater %}table-warning{% endif %}">
+            <td class="fw-semibold">{{ fund.name }}</td>
+            <td>
+              {% if fund.restriction.value == 'permanently_restricted' %}
+                <span class="badge badge-perm rounded-pill">Perm.</span>
+              {% elif fund.restriction.value == 'temporarily_restricted' %}
+                <span class="badge badge-temp rounded-pill">Temp.</span>
+              {% else %}
+                <span class="badge badge-unrestricted rounded-pill">Unres.</span>
+              {% endif %}
+            </td>
+            <td class="text-end text-money">${{ "{:,.2f}".format(fund.current_value) }}</td>
+            <td class="text-end text-money">${{ "{:,.2f}".format(fund.total_corpus) }}</td>
+            <td class="text-end text-money text-success">
+              {% if fund.distributable_amount > 0 %}
+                ${{ "{:,.2f}".format(fund.distributable_amount) }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if fund.is_underwater and not fund.allow_underwater_spend %}
+                <span class="badge badge-underwater"><i class="bi bi-x-circle"></i> Suppressed</span>
+              {% elif fund.is_underwater %}
+                <span class="badge bg-warning text-dark">Underwater (OK)</span>
+              {% else %}
+                <span class="text-success"><i class="bi bi-check-circle-fill"></i></span>
+              {% endif %}
+            </td>
+            <td>
+              {% if fund.is_underwater and not fund.allow_underwater_spend %}
+                <input type="text" class="form-control form-control-sm text-muted" value="Suppressed" disabled>
+              {% else %}
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">$</span>
+                  <input type="number" name="amount_{{ fund.id }}" class="form-control form-control-sm"
+                         step="0.01" min="0" placeholder="0.00"
+                         {% if fund.distributable_amount > 0 %}
+                           value="{{ "%.2f"|format(fund.distributable_amount) }}"
+                         {% endif %}>
+                </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary" onclick="return confirm('Record distributions for all filled-in amounts?')">
+      <i class="bi bi-check-circle me-1"></i> Record All Distributions
+    </button>
+    <a href="{{ url_for('distributions.index') }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

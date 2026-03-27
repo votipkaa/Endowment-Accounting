@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Home</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.index') }}">Pools</a></li>
+  <li class="breadcrumb-item active">{{ title }}</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header"><h2>{{ title }}</h2></div>
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="section-card">
+      <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+          {{ form.name.label(class="form-label") }}
+          {{ form.name(class="form-control", placeholder="e.g. Long-Term Growth Pool") }}
+          {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="mb-4">
+          {{ form.description.label(class="form-label") }}
+          {{ form.description(class="form-control", rows=3, placeholder="Brief description of this pool's purpose or strategy") }}
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle me-1"></i> Save Pool
+          </button>
+          <a href="{{ url_for('pools.index') }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

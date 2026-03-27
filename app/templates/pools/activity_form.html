@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Enter Activity — {{ vehicle.name }}{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.index') }}">Pools</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.detail', pool_id=pool.id) }}">{{ pool.name }}</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.activity_list', pool_id=pool.id, year=year, month=month) }}">Activity</a></li>
+  <li class="breadcrumb-item active">{{ vehicle.name }}</li>
+</ol>
+{% endblock %}
+{% block content %}
+{% set month_names = ['January','February','March','April','May','June','July','August','September','October','November','December'] %}
+<div class="page-header">
+  <h2>{{ "Enter" if not existing else "Edit" }} Monthly Activity</h2>
+  <p class="text-muted mb-0">
+    <strong>{{ vehicle.name }}</strong> — {{ month_names[month-1] }} {{ year }}
+    &nbsp;|&nbsp; Pool: {{ pool.name }}
+  </p>
+</div>
+
+{% if existing and existing.is_approved %}
+<div class="alert alert-warning">
+  <i class="bi bi-lock-fill me-1"></i>
+  <strong>This entry has been approved.</strong> Editing will reset the approval status and require re-approval.
+</div>
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="section-card">
+      <form method="POST" id="activityForm">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+          {{ form.beginning_balance.label(class="form-label") }}
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            {{ form.beginning_balance(class="form-control", id="beg_bal", step="0.01") }}
+          </div>
+        </div>
+
+        <hr class="my-3">
+        <p class="fw-semibold text-muted small text-uppercase mb-2">Activity This Period</p>
+
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label">Management / Admin Expenses</label>
+            <div class="input-group">
+              <span class="input-group-text text-danger">$</span>
+              {{ form.management_expenses(class="form-control calc-field", id="mgmt_exp", step="0.01") }}
+            </div>
+            <small class="text-muted">Enter as positive number (will be subtracted)</small>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Interest & Dividend Income</label>
+            <div class="input-group">
+              <span class="input-group-text text-success">$</span>
+              {{ form.interest_dividends(class="form-control calc-field", id="int_div", step="0.01") }}
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Unrealized Gains / (Losses)</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              {{ form.unrealized_gains(class="form-control calc-field", id="unreal", step="0.01") }}
+            </div>
+            <small class="text-muted">Enter negative for losses</small>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Realized Gains / (Losses)</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              {{ form.realized_gains(class="form-control calc-field", id="real", step="0.01") }}
+            </div>
+            <small class="text-muted">Enter negative for losses</small>
+          </div>
+        </div>
+
+        <!-- Auto-calculated ending balance -->
+        <div class="section-card" style="background: #f8fafc; border: 2px solid #e2e8f0;">
+          <label class="form-label fw-bold">Calculated Ending Balance</label>
+          <div class="display-6 fw-bold text-money" id="calc_ending" style="color: #1e3a5f;">$0.00</div>
+          <small class="text-muted">Beginning Balance + Income − Expenses ± Gains/Losses</small>
+        </div>
+
+        <div class="mb-4 mt-3">
+          {{ form.notes.label(class="form-label") }}
+          {{ form.notes(class="form-control", rows=2, placeholder="Optional notes about this period's activity") }}
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle me-1"></i> Save Activity
+          </button>
+          <a href="{{ url_for('pools.activity_list', pool_id=pool.id, year=year, month=month) }}"
+             class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function recalc() {
+  const beg  = parseFloat(document.getElementById('beg_bal').value)  || 0;
+  const exp  = parseFloat(document.getElementById('mgmt_exp').value) || 0;
+  const inc  = parseFloat(document.getElementById('int_div').value)  || 0;
+  const unrl = parseFloat(document.getElementById('unreal').value)   || 0;
+  const real = parseFloat(document.getElementById('real').value)     || 0;
+  const end  = beg - exp + inc + unrl + real;
+  const el   = document.getElementById('calc_ending');
+  el.textContent = '$' + end.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  el.style.color = end < 0 ? '#dc2626' : '#1e3a5f';
+}
+document.querySelectorAll('.calc-field, #beg_bal').forEach(el => el.addEventListener('input', recalc));
+recalc();
+</script>
+{% endblock %}

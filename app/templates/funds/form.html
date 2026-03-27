@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('funds.index') }}">Funds</a></li>
+  <li class="breadcrumb-item active">{{ title }}</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header"><h2>{{ title }}</h2></div>
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-7">
+    <form method="POST">
+      {{ form.hidden_tag() }}
+
+      <!-- Basic Info -->
+      <div class="section-card mb-3">
+        <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-info-circle me-2"></i>Fund Information</h6>
+        <div class="row g-3">
+          <div class="col-8">
+            {{ form.name.label(class="form-label") }}
+            {{ form.name(class="form-control", placeholder="e.g. Smith Family Endowment Fund") }}
+            {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-4">
+            {{ form.fund_number.label(class="form-label") }}
+            {{ form.fund_number(class="form-control", placeholder="e.g. EF-2024-001") }}
+          </div>
+          <div class="col-6">
+            {{ form.pool_id.label(class="form-label") }}
+            {{ form.pool_id(class="form-select") }}
+            {% for e in form.pool_id.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-6">
+            {{ form.inception_date.label(class="form-label") }}
+            {{ form.inception_date(class="form-control", type="date") }}
+            {% for e in form.inception_date.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Restriction -->
+      <div class="section-card mb-3">
+        <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-shield me-2"></i>Fund Restriction</h6>
+        <div class="mb-3">
+          {{ form.restriction.label(class="form-label") }}
+          {{ form.restriction(class="form-select", id="restrictionSelect") }}
+        </div>
+        <div id="purposeSection" class="mb-2">
+          {{ form.restriction_purpose.label(class="form-label") }}
+          {{ form.restriction_purpose(class="form-control", rows=3, placeholder="Describe the specific purpose or restriction conditions for this fund...") }}
+          <small class="text-muted">Required for Temporarily Restricted funds; recommended for Permanently Restricted.</small>
+        </div>
+      </div>
+
+      <!-- Spendability -->
+      <div class="section-card mb-3">
+        <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-calculator me-2"></i>Spendability Settings</h6>
+        <div class="row g-3">
+          <div class="col-6">
+            {{ form.spend_rate.label(class="form-label") }}
+            <div class="input-group">
+              {{ form.spend_rate(class="form-control", step="0.1", placeholder="5.0") }}
+              <span class="input-group-text">%</span>
+            </div>
+            <small class="text-muted">Annual distribution rate (e.g. 5.0 for 5%)</small>
+            {% for e in form.spend_rate.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-6 d-flex align-items-end">
+            <div class="form-check form-switch mb-2">
+              {{ form.allow_underwater_spend(class="form-check-input", style="width:2.5rem") }}
+              <label class="form-check-label ms-2">
+                Allow distributions when fund is underwater
+                <small class="d-block text-muted">Donor must agree to this in writing before enabling</small>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="section-card mb-4">
+        <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-journal-text me-2"></i>Notes</h6>
+        {{ form.notes(class="form-control", rows=3, placeholder="Any additional notes about this fund...") }}
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-circle me-1"></i> Save Fund
+        </button>
+        <a href="{{ url_for('funds.index') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const sel = document.getElementById('restrictionSelect');
+const sec = document.getElementById('purposeSection');
+function updatePurpose() {
+  const val = sel.value;
+  sec.style.display = val === 'unrestricted' ? 'none' : '';
+}
+sel.addEventListener('change', updatePurpose);
+updatePurpose();
+</script>
+{% endblock %}

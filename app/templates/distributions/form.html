@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Record Distribution{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('distributions.index') }}">Distributions</a></li>
+  <li class="breadcrumb-item active">Record Distribution</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header"><h2>Record Distribution</h2></div>
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    {% if selected_fund %}
+    <div class="section-card mb-3" style="background: #f0f9ff; border-left: 4px solid #2a5298;">
+      <div class="row">
+        <div class="col">
+          <div class="small text-muted">Current Fund Value</div>
+          <div class="fw-bold text-money">${{ "{:,.2f}".format(selected_fund.current_value) }}</div>
+        </div>
+        <div class="col">
+          <div class="small text-muted">Corpus</div>
+          <div class="fw-bold text-money">${{ "{:,.2f}".format(selected_fund.total_corpus) }}</div>
+        </div>
+        <div class="col">
+          <div class="small text-muted">Annual Distributable ({{ "%.1f"|format(selected_fund.spend_rate * 100) }}%)</div>
+          <div class="fw-bold text-money text-success">${{ "{:,.2f}".format(selected_fund.distributable_amount) }}</div>
+        </div>
+        {% if selected_fund.is_underwater %}
+        <div class="col-12 mt-2">
+          <span class="badge badge-underwater">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>Fund is underwater
+            {% if not selected_fund.allow_underwater_spend %} — distributions suppressed{% endif %}
+          </span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="section-card">
+      <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+          {{ form.fund_id.label(class="form-label") }}
+          {{ form.fund_id(class="form-select", id="fundSelect") }}
+          {% for e in form.fund_id.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            {{ form.amount.label(class="form-label") }}
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              {{ form.amount(class="form-control", step="0.01", placeholder="0.00") }}
+            </div>
+            {% for e in form.amount.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-6">
+            {{ form.distribution_date.label(class="form-label") }}
+            {{ form.distribution_date(class="form-control", type="date") }}
+          </div>
+        </div>
+        <div class="mb-3">
+          {{ form.recipient.label(class="form-label") }}
+          {{ form.recipient(class="form-control", placeholder="Recipient or payee name") }}
+        </div>
+        <div class="mb-3">
+          {{ form.purpose.label(class="form-label") }}
+          {{ form.purpose(class="form-control", rows=3, placeholder="Describe the purpose of this distribution (required for temporarily restricted funds)") }}
+        </div>
+        <div class="mb-4">
+          {{ form.notes.label(class="form-label") }}
+          {{ form.notes(class="form-control", rows=2, placeholder="Internal notes (not included in reports)") }}
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle me-1"></i> Record Distribution
+          </button>
+          <a href="{{ url_for('distributions.index') }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Endowment Manager{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --sidebar-width: 240px;
+      --brand-color: #1e3a5f;
+      --brand-light: #2a5298;
+      --accent: #e8a020;
+    }
+    body { background: #f4f6f9; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      position: fixed; top: 0; left: 0; height: 100vh;
+      width: var(--sidebar-width); background: var(--brand-color);
+      color: #fff; display: flex; flex-direction: column;
+      z-index: 1000; overflow-y: auto;
+    }
+    #sidebar .brand {
+      padding: 1.25rem 1rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+    #sidebar .brand h5 { margin: 0; font-weight: 700; font-size: 1rem; color: #fff; }
+    #sidebar .brand small { color: rgba(255,255,255,0.55); font-size: 0.75rem; }
+    #sidebar .nav-section {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: .08em;
+      color: rgba(255,255,255,0.4); padding: 1rem 1rem 0.25rem; text-transform: uppercase;
+    }
+    #sidebar .nav-link {
+      color: rgba(255,255,255,0.8); padding: .45rem 1rem;
+      border-radius: 6px; margin: 1px 8px; font-size: 0.875rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    #sidebar .nav-link:hover, #sidebar .nav-link.active {
+      background: rgba(255,255,255,0.12); color: #fff;
+    }
+    #sidebar .nav-link i { font-size: 1rem; width: 1.2rem; }
+    #sidebar .sidebar-footer {
+      margin-top: auto; border-top: 1px solid rgba(255,255,255,0.12);
+      padding: 0.75rem 1rem;
+    }
+
+    /* ── Main ── */
+    #main { margin-left: var(--sidebar-width); min-height: 100vh; }
+    .topbar {
+      background: #fff; border-bottom: 1px solid #e2e8f0;
+      padding: .6rem 1.5rem; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 900;
+    }
+    .page-content { padding: 1.75rem 1.75rem; }
+
+    /* ── Cards ── */
+    .stat-card {
+      background: #fff; border-radius: 12px; padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06); border-left: 4px solid var(--brand-light);
+    }
+    .stat-card.accent  { border-left-color: var(--accent); }
+    .stat-card.success { border-left-color: #2e7d32; }
+    .stat-card.danger  { border-left-color: #c62828; }
+    .stat-card .label  { font-size: .75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
+    .stat-card .value  { font-size: 1.65rem; font-weight: 700; color: #111827; margin-top: .1rem; }
+    .stat-card .sub    { font-size: .8rem; color: #9ca3af; margin-top: .1rem; }
+
+    .card { border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    .card-header { background: #fff; border-bottom: 1px solid #f1f5f9; padding: 1rem 1.25rem; border-radius: 12px 12px 0 0 !important; }
+    .card-header h6 { font-weight: 700; color: #1e3a5f; margin: 0; }
+
+    /* ── Badges ── */
+    .badge-perm   { background: #fef3c7; color: #92400e; }
+    .badge-temp   { background: #dbeafe; color: #1e40af; }
+    .badge-unrestricted { background: #dcfce7; color: #166534; }
+    .badge-underwater { background: #fee2e2; color: #991b1b; }
+
+    /* ── Tables ── */
+    .table { font-size: .875rem; }
+    .table th { font-weight: 600; color: #374151; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+    .table-hover tbody tr:hover { background: #f8fafc; }
+
+    /* ── Forms ── */
+    .form-label { font-weight: 600; font-size: .85rem; color: #374151; }
+    .form-control:focus, .form-select:focus { border-color: var(--brand-light); box-shadow: 0 0 0 3px rgba(42,82,152,.15); }
+    .section-card { background: #fff; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.25rem; }
+
+    /* ── Alerts ── */
+    .alert { border-radius: 10px; border: none; }
+
+    /* ── Misc ── */
+    .page-header { margin-bottom: 1.5rem; }
+    .page-header h2 { font-weight: 700; color: var(--brand-color); margin: 0; }
+    .btn-primary { background: var(--brand-light); border-color: var(--brand-light); }
+    .btn-primary:hover { background: var(--brand-color); border-color: var(--brand-color); }
+    .text-money { font-family: 'Courier New', monospace; font-weight: 600; }
+    .underwater-flag { color: #dc2626; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+<!-- ── Sidebar ─────────────────────────── -->
+<nav id="sidebar">
+  <div class="brand">
+    <h5><i class="bi bi-bank2"></i> Endowment Manager</h5>
+    <small>Fund Accounting System</small>
+  </div>
+
+  <div class="nav-section">Main</div>
+  <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+    <i class="bi bi-grid-1x2"></i> Dashboard
+  </a>
+
+  <div class="nav-section">Investments</div>
+  <a href="{{ url_for('pools.index') }}" class="nav-link {% if 'pools' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-layers"></i> Investment Pools
+  </a>
+
+  <div class="nav-section">Funds</div>
+  <a href="{{ url_for('funds.index') }}" class="nav-link {% if request.endpoint in ['funds.index'] %}active{% endif %}">
+    <i class="bi bi-wallet2"></i> All Funds
+  </a>
+  {% if current_user.can_edit %}
+  <a href="{{ url_for('funds.new_fund') }}" class="nav-link">
+    <i class="bi bi-plus-circle"></i> New Fund
+  </a>
+  {% endif %}
+
+  <div class="nav-section">Distributions</div>
+  <a href="{{ url_for('distributions.index') }}" class="nav-link {% if 'distributions' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-cash-stack"></i> Distributions
+  </a>
+  {% if current_user.can_edit %}
+  <a href="{{ url_for('distributions.new_distribution') }}" class="nav-link">
+    <i class="bi bi-plus-circle"></i> New Distribution
+  </a>
+  <a href="{{ url_for('distributions.batch_distribution') }}" class="nav-link">
+    <i class="bi bi-list-check"></i> Batch Distribution
+  </a>
+  {% endif %}
+
+  <div class="nav-section">Reports</div>
+  <a href="{{ url_for('reports.spendability') }}" class="nav-link {% if request.endpoint == 'reports.spendability' %}active{% endif %}">
+    <i class="bi bi-calculator"></i> Spendability
+  </a>
+  <a href="{{ url_for('reports.distributions_history') }}" class="nav-link {% if request.endpoint == 'reports.distributions_history' %}active{% endif %}">
+    <i class="bi bi-clock-history"></i> Distribution History
+  </a>
+  <a href="{{ url_for('reports.audit') }}" class="nav-link {% if request.endpoint == 'reports.audit' %}active{% endif %}">
+    <i class="bi bi-shield-check"></i> Audit Log
+  </a>
+
+  {% if current_user.role.value == 'admin' %}
+  <div class="nav-section">Administration</div>
+  <a href="{{ url_for('admin.users') }}" class="nav-link {% if 'admin' in request.endpoint %}active{% endif %}">
+    <i class="bi bi-people"></i> Users
+  </a>
+  {% endif %}
+
+  <div class="sidebar-footer">
+    <small class="text-white-50 d-block mb-1">
+      <i class="bi bi-person-circle"></i> {{ current_user.username }}
+      <span class="badge bg-secondary ms-1" style="font-size:.65rem">{{ current_user.role.value.replace('_',' ') }}</span>
+    </small>
+    <a href="{{ url_for('auth.logout') }}" class="nav-link p-0" style="font-size:.8rem">
+      <i class="bi bi-box-arrow-left"></i> Sign Out
+    </a>
+  </div>
+</nav>
+
+<!-- ── Main ──────────────────────────────── -->
+<div id="main">
+  <div class="topbar">
+    <nav aria-label="breadcrumb">
+      {% block breadcrumb %}<ol class="breadcrumb mb-0"><li class="breadcrumb-item active">Home</li></ol>{% endblock %}
+    </nav>
+    <span class="text-muted" style="font-size:.8rem">
+      <i class="bi bi-calendar3"></i>
+      {{ now.strftime("%B %d, %Y") }}
+    </span>
+  </div>
+
+  <div class="page-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+          {{ msg }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+{% else %}
+  {% block auth_content %}{% endblock %}
+{% endif %}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: endowment-manager
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: endowment-db
+          property: connectionString
+    autoDeploy: true
+
+databases:
+  - name: endowment-db
+    plan: free
+    databaseName: endowment
+    user: endowment_user

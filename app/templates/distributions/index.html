@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Distributions{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Home</a></li>
+  <li class="breadcrumb-item active">Distributions</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div>
+    <h2>Distributions</h2>
+    <p class="text-muted mb-0">{{ distributions|length }} recorded distribution(s)</p>
+  </div>
+  {% if current_user.can_edit %}
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('distributions.new_distribution') }}" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i> New Distribution
+    </a>
+    <a href="{{ url_for('distributions.batch_distribution') }}" class="btn btn-outline-primary">
+      <i class="bi bi-list-check me-1"></i> Batch
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Fund</th>
+          <th>Date</th>
+          <th>Recipient</th>
+          <th>Purpose</th>
+          <th class="text-end">Amount</th>
+          <th>Recorded By</th>
+          {% if current_user.can_approve %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in distributions %}
+        <tr>
+          <td class="fw-semibold">
+            <a href="{{ url_for('funds.detail', fund_id=d.fund_id) }}" class="text-decoration-none">{{ d.fund.name }}</a>
+          </td>
+          <td>{{ d.distribution_date.strftime("%m/%d/%Y") }}</td>
+          <td>{{ d.recipient or '—' }}</td>
+          <td class="small text-muted">{{ (d.purpose or '')[:60] }}{% if d.purpose and d.purpose|length > 60 %}…{% endif %}</td>
+          <td class="text-end text-money fw-bold text-danger">${{ "{:,.2f}".format(d.amount) }}</td>
+          <td class="small text-muted">{{ d.created_by.username if d.created_by else '—' }}</td>
+          {% if current_user.can_approve %}
+          <td>
+            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal"
+                    data-bs-target="#voidModal" data-id="{{ d.id }}">Void</button>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-5">
+            No distributions recorded.
+            {% if current_user.can_edit %}<a href="{{ url_for('distributions.new_distribution') }}">Record the first distribution.</a>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if distributions %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="4">TOTAL</td>
+          <td class="text-end text-money text-danger">
+            ${{ "{:,.2f}".format(distributions | sum(attribute='amount')) }}
+          </td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% if current_user.can_approve %}
+<div class="modal fade" id="voidModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Void Distribution</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST" id="voidForm">
+      <div class="modal-body">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Reason for voiding</label>
+          <textarea name="reason" class="form-control" rows="3" required></textarea>
+        </div>
+        <div class="alert alert-warning">The distribution will remain in the system with a voided status for audit purposes.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-danger">Void Distribution</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+<script>
+document.getElementById('voidModal').addEventListener('show.bs.modal', function(e) {
+  document.getElementById('voidForm').action = '/distributions/' + e.relatedTarget.dataset.id + '/void';
+});
+</script>
+{% endif %}
+{% endblock %}

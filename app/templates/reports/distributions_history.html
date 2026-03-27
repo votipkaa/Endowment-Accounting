@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Distribution History{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Home</a></li>
+  <li class="breadcrumb-item active">Distribution History</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div><h2>Distribution History</h2></div>
+  <button onclick="window.print()" class="btn btn-outline-secondary">
+    <i class="bi bi-printer me-1"></i> Print
+  </button>
+</div>
+<div class="section-card mb-3">
+  <form method="GET" class="row g-2">
+    <div class="col-auto"><label class="form-label fw-semibold mb-1">Year</label>
+      <input type="number" name="year" class="form-control form-control-sm" value="{{ year or '' }}" placeholder="Any" style="width:90px"></div>
+    <div class="col-auto"><label class="form-label fw-semibold mb-1">Month</label>
+      <select name="month" class="form-select form-select-sm" style="width:120px">
+        <option value="">Any</option>
+        {% set mnms = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+        {% for i in range(1,13) %}<option value="{{ i }}" {% if month == i %}selected{% endif %}>{{ mnms[i-1] }}</option>{% endfor %}
+      </select></div>
+    <div class="col-auto"><label class="form-label fw-semibold mb-1">Pool</label>
+      <select name="pool_id" class="form-select form-select-sm">
+        <option value="">All Pools</option>
+        {% for p in pools %}<option value="{{ p.id }}" {% if pool_filter == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+      </select></div>
+    <div class="col-auto d-flex align-items-end"><button type="submit" class="btn btn-primary btn-sm">Filter</button>
+      <a href="{{ url_for('reports.distributions_history') }}" class="btn btn-outline-secondary btn-sm ms-2">Clear</a></div>
+  </form>
+</div>
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Date</th><th>Fund</th><th>Recipient</th><th>Purpose</th><th class="text-end">Amount</th></tr>
+      </thead>
+      <tbody>
+        {% for d in distributions %}
+        <tr>
+          <td>{{ d.distribution_date.strftime("%m/%d/%Y") }}</td>
+          <td><a href="{{ url_for('funds.detail', fund_id=d.fund_id) }}" class="fw-semibold text-decoration-none">{{ d.fund.name }}</a></td>
+          <td>{{ d.recipient or '—' }}</td>
+          <td class="small text-muted">{{ (d.purpose or '')[:80] }}</td>
+          <td class="text-end text-money fw-bold">${{ "{:,.2f}".format(d.amount) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No distributions for the selected period.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if distributions %}
+      <tfoot class="table-light fw-bold">
+        <tr><td colspan="4">TOTAL</td><td class="text-end text-money">${{ "{:,.2f}".format(total) }}</td></tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+<style>@media print { #sidebar, .topbar, form, .btn { display:none!important; } #main { margin-left:0!important; } }</style>
+{% endblock %}

@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}{{ pool.name }} — Pool Detail{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Home</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.index') }}">Pools</a></li>
+  <li class="breadcrumb-item active">{{ pool.name }}</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div>
+    <h2>{{ pool.name }}</h2>
+    {% if pool.description %}<p class="text-muted mb-0">{{ pool.description }}</p>{% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('pools.activity_list', pool_id=pool.id) }}" class="btn btn-primary">
+      <i class="bi bi-table me-1"></i> Monthly Activity
+    </a>
+    {% if current_user.can_edit %}
+    <a href="{{ url_for('pools.new_vehicle', pool_id=pool.id) }}" class="btn btn-outline-primary">
+      <i class="bi bi-plus-circle me-1"></i> Add Vehicle
+    </a>
+    <a href="{{ url_for('pools.edit_pool', pool_id=pool.id) }}" class="btn btn-outline-secondary">
+      <i class="bi bi-pencil"></i>
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Investment Vehicles -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><h6><i class="bi bi-briefcase me-2"></i>Investment Vehicles</h6></div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr><th>Vehicle</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            {% for v in pool.vehicles.filter_by(is_active=True).all() %}
+            <tr>
+              <td class="fw-semibold">
+                <a href="{{ url_for('pools.vehicle_detail', pool_id=pool.id, vehicle_id=v.id) }}"
+                   class="text-decoration-none">
+                  <i class="bi bi-graph-up-arrow me-1 text-muted"></i>{{ v.name }}
+                </a>
+              </td>
+              <td class="text-muted small">{{ v.description or '—' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="2" class="text-muted text-center py-3">
+                No vehicles yet.
+                {% if current_user.can_edit %}
+                <a href="{{ url_for('pools.new_vehicle', pool_id=pool.id) }}">Add one.</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Unit Price History -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><h6><i class="bi bi-graph-up me-2"></i>Unit Price History</h6></div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Period</th>
+              <th class="text-end">Total Value</th>
+              <th class="text-end">Total Units</th>
+              <th class="text-end">Unit Price</th>
+              <th class="text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in snapshots %}
+            <tr>
+              <td class="fw-semibold">{{ "%04d-%02d"|format(s.year, s.month) }}</td>
+              <td class="text-end text-money">${{ "{:,.2f}".format(s.total_value) }}</td>
+              <td class="text-end text-money">{{ "{:,.4f}".format(s.total_units) }}</td>
+              <td class="text-end text-money">${{ "{:.6f}".format(s.unit_price) }}</td>
+              <td class="text-center">
+                {% if s.is_closed %}
+                  <span class="badge bg-success rounded-pill">Closed</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark rounded-pill">Open</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-muted text-center py-3">No monthly snapshots yet. Enter monthly activity to generate unit prices.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Participating Funds -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6><i class="bi bi-wallet2 me-2"></i>Participating Funds ({{ funds|length }})</h6>
+        {% if current_user.can_edit %}
+        <a href="{{ url_for('funds.new_fund') }}?pool={{ pool.id }}" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus"></i> New Fund in this Pool
+        </a>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Fund Name</th>
+              <th>Restriction</th>
+              <th class="text-end">Corpus</th>
+              <th class="text-end">Current Value</th>
+              <th class="text-end">Units Held</th>
+              <th class="text-center">Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in funds %}
+            <tr>
+              <td class="fw-semibold">{{ f.name }}</td>
+              <td>
+                {% if f.restriction.value == 'permanently_restricted' %}
+                  <span class="badge badge-perm rounded-pill">Perm.</span>
+                {% elif f.restriction.value == 'temporarily_restricted' %}
+                  <span class="badge badge-temp rounded-pill">Temp.</span>
+                {% else %}
+                  <span class="badge badge-unrestricted rounded-pill">Unrestricted</span>
+                {% endif %}
+              </td>
+              <td class="text-end text-money">${{ "{:,.2f}".format(f.total_corpus) }}</td>
+              <td class="text-end text-money">${{ "{:,.2f}".format(f.current_value) }}</td>
+              <td class="text-end text-money">{{ "{:,.4f}".format(f.current_units) }}</td>
+              <td class="text-center">
+                {% if f.is_underwater %}
+                  <span class="badge badge-underwater"><i class="bi bi-exclamation-triangle-fill"></i> Underwater</span>
+                {% else %}
+                  <span class="text-success"><i class="bi bi-check-circle-fill"></i></span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{{ url_for('funds.detail', fund_id=f.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-muted text-center py-3">No funds in this pool yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Documents -->
+  <div class="col-12">
+    {% with entity_type="pool", entity_id=pool.id, documents=pool_documents %}
+      {% include "documents/_section.html" %}
+    {% endwith %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}All Funds{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Home</a></li>
+  <li class="breadcrumb-item active">Funds</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div>
+    <h2>Endowment Funds</h2>
+    <p class="text-muted mb-0">{{ funds|length }} active fund(s)</p>
+  </div>
+  {% if current_user.can_edit %}
+  <a href="{{ url_for('funds.new_fund') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i> New Fund
+  </a>
+  {% endif %}
+</div>
+
+<!-- Filters -->
+<div class="section-card mb-3">
+  <form method="GET" class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label class="form-label fw-semibold mb-1">Filter by Pool</label>
+      <select name="pool_id" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All Pools</option>
+        {% for p in pools %}
+          <option value="{{ p.id }}" {% if pool_filter == p.id %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <label class="form-label fw-semibold mb-1">Filter by Restriction</label>
+      <select name="restriction" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All Types</option>
+        <option value="permanently_restricted" {% if restriction_filter == 'permanently_restricted' %}selected{% endif %}>Permanently Restricted</option>
+        <option value="temporarily_restricted" {% if restriction_filter == 'temporarily_restricted' %}selected{% endif %}>Temporarily Restricted</option>
+        <option value="unrestricted" {% if restriction_filter == 'unrestricted' %}selected{% endif %}>Unrestricted</option>
+      </select>
+    </div>
+    {% if pool_filter or restriction_filter %}
+    <div class="col-auto">
+      <a href="{{ url_for('funds.index') }}" class="btn btn-outline-secondary btn-sm">Clear Filters</a>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Fund Name</th>
+          <th>Number</th>
+          <th>Pool</th>
+          <th>Restriction</th>
+          <th class="text-end">Corpus</th>
+          <th class="text-end">Current Value</th>
+          <th class="text-end">Earnings</th>
+          <th class="text-end">Spend Rate</th>
+          <th class="text-center">Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in funds %}
+        <tr>
+          <td class="fw-semibold">
+            <a href="{{ url_for('funds.detail', fund_id=f.id) }}" class="text-decoration-none">{{ f.name }}</a>
+          </td>
+          <td class="text-muted small">{{ f.fund_number or '—' }}</td>
+          <td class="small">{{ f.pool.name }}</td>
+          <td>
+            {% if f.restriction.value == 'permanently_restricted' %}
+              <span class="badge badge-perm rounded-pill">Permanently Restricted</span>
+            {% elif f.restriction.value == 'temporarily_restricted' %}
+              <span class="badge badge-temp rounded-pill">Temporarily Restricted</span>
+            {% else %}
+              <span class="badge badge-unrestricted rounded-pill">Unrestricted</span>
+            {% endif %}
+          </td>
+          <td class="text-end text-money">${{ "{:,.2f}".format(f.total_corpus) }}</td>
+          <td class="text-end text-money fw-bold">${{ "{:,.2f}".format(f.current_value) }}</td>
+          <td class="text-end text-money {% if f.accumulated_earnings < 0 %}text-danger{% else %}text-success{% endif %}">
+            {{ "+" if f.accumulated_earnings >= 0 else "" }}${{ "{:,.2f}".format(f.accumulated_earnings) }}
+          </td>
+          <td class="text-end">{{ "%.1f"|format(f.spend_rate * 100) }}%</td>
+          <td class="text-center">
+            {% if f.is_underwater %}
+              <span class="badge badge-underwater"><i class="bi bi-exclamation-triangle-fill"></i> Underwater</span>
+            {% else %}
+              <span class="text-success"><i class="bi bi-check-circle-fill"></i></span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('funds.detail', fund_id=f.id) }}" class="btn btn-sm btn-outline-secondary">
+              Detail <i class="bi bi-chevron-right"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="10" class="text-muted text-center py-5">
+            <i class="bi bi-wallet2" style="font-size:2rem;display:block;margin-bottom:.5rem;color:#cbd5e0"></i>
+            No funds found. {% if current_user.can_edit %}<a href="{{ url_for('funds.new_fund') }}">Create the first fund.</a>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if funds %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="4">TOTALS ({{ funds|length }} funds)</td>
+          <td class="text-end text-money">${{ "{:,.2f}".format(funds|sum(attribute='total_corpus')) }}</td>
+          <td class="text-end text-money">${{ "{:,.2f}".format(funds|sum(attribute='current_value')) }}</td>
+          <td class="text-end text-money"></td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}

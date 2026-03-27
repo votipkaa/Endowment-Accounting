@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Add Contribution — {{ fund.name }}{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('funds.index') }}">Funds</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('funds.detail', fund_id=fund.id) }}">{{ fund.name }}</a></li>
+  <li class="breadcrumb-item active">Add Contribution</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Add Contribution</h2>
+  <p class="text-muted mb-0">Fund: <strong>{{ fund.name }}</strong> &nbsp;|&nbsp; Pool: {{ fund.pool.name }}</p>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="section-card">
+      <div class="alert alert-info mb-4">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong>How buy-in works:</strong> The contribution amount becomes part of the fund's corpus immediately.
+        Units are purchased at the <em>end-of-month closing unit price</em> for the selected Buy-In month.
+        The fund begins participating in pool earnings the <em>following month</em>.
+      </div>
+      <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="row g-3">
+          <div class="col-12">
+            {{ form.donor_name.label(class="form-label") }}
+            {{ form.donor_name(class="form-control", placeholder="Full name of donor or organization") }}
+            {% for e in form.donor_name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-6">
+            {{ form.amount.label(class="form-label") }}
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              {{ form.amount(class="form-control", step="0.01", placeholder="0.00") }}
+            </div>
+            {% for e in form.amount.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-6">
+            {{ form.contribution_date.label(class="form-label") }}
+            {{ form.contribution_date(class="form-control", type="date") }}
+          </div>
+          <div class="col-12">
+            <hr>
+            <p class="fw-bold text-muted small text-uppercase mb-2">Buy-In Period</p>
+            <p class="small text-muted mb-2">
+              Which month-end should this contribution purchase units?
+              The system will use that month's closing unit price.
+            </p>
+          </div>
+          <div class="col-6">
+            {{ form.buy_in_year.label(class="form-label") }}
+            {{ form.buy_in_year(class="form-select") }}
+          </div>
+          <div class="col-6">
+            {{ form.buy_in_month.label(class="form-label") }}
+            {{ form.buy_in_month(class="form-select") }}
+          </div>
+          <div class="col-12">
+            {{ form.notes.label(class="form-label") }}
+            {{ form.notes(class="form-control", rows=2, placeholder="Optional notes about this contribution") }}
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-check-circle me-1"></i> Add Contribution
+          </button>
+          <a href="{{ url_for('funds.detail', fund_id=fund.id) }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

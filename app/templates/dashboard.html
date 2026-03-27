@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Endowment Manager{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item active"><i class="bi bi-grid-1x2 me-1"></i>Dashboard</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>Dashboard</h2>
+  <p class="text-muted mb-0">Overview of all endowment funds and pools</p>
+</div>
+
+<!-- ── Summary Stats ── -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card success">
+      <div class="label">Total Fund Value</div>
+      <div class="value text-money">${{ "{:,.2f}".format(total_pool_value) }}</div>
+      <div class="sub">Across {{ funds|length }} active funds</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+      <div class="label">Total Corpus</div>
+      <div class="value text-money">${{ "{:,.2f}".format(total_corpus) }}</div>
+      <div class="sub">Original donated principal</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card accent">
+      <div class="label">Total Distributable</div>
+      <div class="value text-money">${{ "{:,.2f}".format(total_distributable) }}</div>
+      <div class="sub">At each fund's spend rate</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card {% if underwater_count > 0 %}danger{% endif %}">
+      <div class="label">Underwater Funds</div>
+      <div class="value">{{ underwater_count }}</div>
+      <div class="sub">Below original corpus</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- ── Investment Pools ── -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6><i class="bi bi-layers me-2"></i>Investment Pools</h6>
+        {% if current_user.can_edit %}
+        <a href="{{ url_for('pools.new_pool') }}" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus"></i> New Pool
+        </a>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Pool</th>
+              <th class="text-end">Vehicles</th>
+              <th class="text-end">Funds</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pool in pools %}
+            <tr>
+              <td class="fw-semibold">{{ pool.name }}</td>
+              <td class="text-end">{{ pool.vehicles.filter_by(is_active=True).count() }}</td>
+              <td class="text-end">{{ pool.funds.filter_by(is_active=True).count() }}</td>
+              <td class="text-end">
+                <a href="{{ url_for('pools.detail', pool_id=pool.id) }}" class="btn btn-xs btn-outline-secondary btn-sm">
+                  View
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-muted text-center py-3">No pools yet. <a href="{{ url_for('pools.new_pool') }}">Create one.</a></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Fund Summary ── -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6><i class="bi bi-wallet2 me-2"></i>Fund Summary</h6>
+        <a href="{{ url_for('funds.index') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Fund</th>
+              <th>Type</th>
+              <th class="text-end">Value</th>
+              <th class="text-end">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fund in funds[:8] %}
+            <tr>
+              <td>
+                <a href="{{ url_for('funds.detail', fund_id=fund.id) }}" class="text-decoration-none fw-semibold">
+                  {{ fund.name }}
+                </a>
+              </td>
+              <td>
+                {% if fund.restriction.value == 'permanently_restricted' %}
+                  <span class="badge badge-perm rounded-pill">Perm.</span>
+                {% elif fund.restriction.value == 'temporarily_restricted' %}
+                  <span class="badge badge-temp rounded-pill">Temp.</span>
+                {% else %}
+                  <span class="badge badge-unrestricted rounded-pill">Unrestricted</span>
+                {% endif %}
+              </td>
+              <td class="text-end text-money">${{ "{:,.2f}".format(fund.current_value) }}</td>
+              <td class="text-end">
+                {% if fund.is_underwater %}
+                  <span class="badge badge-underwater"><i class="bi bi-exclamation-triangle-fill"></i> Underwater</span>
+                {% else %}
+                  <span class="text-success" style="font-size:.8rem"><i class="bi bi-check-circle-fill"></i></span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-muted text-center py-3">No funds yet. <a href="{{ url_for('funds.new_fund') }}">Create one.</a></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Recent Distributions ── -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6><i class="bi bi-cash-stack me-2"></i>Recent Distributions</h6>
+        <a href="{{ url_for('distributions.index') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr><th>Fund</th><th>Date</th><th class="text-end">Amount</th></tr>
+          </thead>
+          <tbody>
+            {% for d in recent_distributions %}
+            <tr>
+              <td class="fw-semibold">{{ d.fund.name }}</td>
+              <td>{{ d.distribution_date.strftime("%m/%d/%Y") }}</td>
+              <td class="text-end text-money">${{ "{:,.2f}".format(d.amount) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-muted text-center py-3">No distributions recorded yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Recent Audit ── -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6><i class="bi bi-shield-check me-2"></i>Recent Activity Log</h6>
+        <a href="{{ url_for('reports.audit') }}" class="btn btn-sm btn-outline-secondary">Full Log</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr><th>User</th><th>Action</th><th>Time</th></tr>
+          </thead>
+          <tbody>
+            {% for log in recent_audit %}
+            <tr>
+              <td>{{ log.user.username if log.user else '—' }}</td>
+              <td style="font-size:.8rem" class="text-truncate" style="max-width:200px">{{ log.description or log.action.value }}</td>
+              <td class="text-muted" style="font-size:.8rem">{{ log.timestamp.strftime("%m/%d %H:%M") }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-muted text-center py-3">No activity yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
