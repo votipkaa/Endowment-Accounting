@@ -11,6 +11,7 @@ from sqlalchemy import func
 from decimal import Decimal
 from datetime import datetime, date
 import os
+import traceback
 
 from models import (
     db, User, UserRole, FundRestriction, AuditAction,
@@ -112,10 +113,26 @@ def create_app():
             sidebar_pools=sidebar_pools,
         )
 
+    # Temporary debug error handler — shows the full traceback in the browser
+    # Remove this once the 500 error is diagnosed
+    @app.errorhandler(500)
+    def handle_500(e):
+        tb = traceback.format_exc()
+        return (
+            f"<h2>500 Internal Server Error</h2>"
+            f"<p>Please copy this and send to your developer:</p>"
+            f"<pre style='background:#f8f8f8;padding:1rem;font-size:.85rem;overflow:auto'>{tb}</pre>",
+            500,
+        )
+
     # Create tables and seed admin on first run
     with app.app_context():
-        db.create_all()
-        _seed_admin()
+        try:
+            db.create_all()
+            _seed_admin()
+        except Exception as exc:
+            print(f"[STARTUP ERROR] db.create_all() failed: {exc}")
+            traceback.print_exc()
 
     return app
 
