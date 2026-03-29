@@ -63,6 +63,73 @@ class User(UserMixin, db.Model):
         return f"<User {self.username}>"
 
 # ─────────────────────────────────────────────
+# Donors
+# ─────────────────────────────────────────────
+
+class DonorType(str, enum.Enum):
+    INDIVIDUAL   = "individual"
+    ORGANIZATION = "organization"
+    FOUNDATION   = "foundation"
+    TRUST        = "trust"
+    ESTATE       = "estate"
+    OTHER        = "other"
+
+
+class Donor(db.Model):
+    __tablename__ = "donors"
+    id              = db.Column(db.Integer, primary_key=True)
+    donor_type      = db.Column(db.Enum(DonorType), nullable=False, default=DonorType.INDIVIDUAL)
+    # Name fields
+    first_name      = db.Column(db.String(100))
+    last_name       = db.Column(db.String(100))
+    organization    = db.Column(db.String(200))
+    display_name    = db.Column(db.String(250), nullable=False)   # Computed or user-entered
+    # Contact
+    email           = db.Column(db.String(200))
+    email_secondary = db.Column(db.String(200))
+    phone           = db.Column(db.String(30))
+    phone_secondary = db.Column(db.String(30))
+    # Address
+    address_line1   = db.Column(db.String(200))
+    address_line2   = db.Column(db.String(200))
+    city            = db.Column(db.String(100))
+    state           = db.Column(db.String(50))
+    zip_code        = db.Column(db.String(20))
+    country         = db.Column(db.String(80), default="United States")
+    # Meta
+    notes           = db.Column(db.Text)
+    is_active       = db.Column(db.Boolean, default=True)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by_id   = db.Column(db.Integer, db.ForeignKey("users.id"))
+
+    contributions   = db.relationship("FundContribution", backref="donor", lazy="dynamic")
+    created_by      = db.relationship("User", foreign_keys=[created_by_id])
+
+    @property
+    def full_address(self):
+        parts = [self.address_line1, self.address_line2]
+        city_state = ", ".join(filter(None, [self.city, self.state]))
+        if city_state and self.zip_code:
+            city_state += f" {self.zip_code}"
+        parts.append(city_state)
+        return "\n".join(filter(None, parts))
+
+    @property
+    def total_given(self):
+        from sqlalchemy import func as sqlfunc
+        result = db.session.query(sqlfunc.sum(FundContribution.amount))\
+            .filter_by(donor_id=self.id, is_voided=False).scalar()
+        return float(result or 0)
+
+    @property
+    def gift_count(self):
+        return self.contributions.filter_by(is_voided=False).count()
+
+    def __repr__(self):
+        return f"<Donor {self.display_name}>"
+
+
+# ─────────────────────────────────────────────
 # Investment Pools & Vehicles
 # ─────────────────────────────────────────────
 
@@ -117,6 +184,8 @@ class VehicleMonthlyActivity(db.Model):
     month               = db.Column(db.Integer, nullable=False)  # 1-12
 
     beginning_balance   = db.Column(db.Numeric(18, 4), default=0)
+    additions           = db.Column(db.Numeric(18, 4), default=0)   # Cash added (gifts invested, transfers in)
+    withdrawals         = db.Column(db.Numeric(18, 4), default=0)   # Cash removed (distributions, transfers out)
     management_expenses = db.Column(db.Numeric(18, 4), default=0)
     interest_dividends  = db.Column(db.Numeric(18, 4), default=0)
     unrealized_gains    = db.Column(db.Numeric(18, 4), default=0)
@@ -137,7 +206,9 @@ class VehicleMonthlyActivity(db.Model):
 
     @property
     def net_activity(self):
-        return (float(self.interest_dividends or 0)
+        return (float(self.additions or 0)
+                - float(self.withdrawals or 0)
+                + float(self.interest_dividends or 0)
                 + float(self.unrealized_gains or 0)
                 + float(self.realized_gains or 0)
                 - float(self.management_expenses or 0))
@@ -242,7 +313,8 @@ class FundContribution(db.Model):
     __tablename__ = "fund_contributions"
     id              = db.Column(db.Integer, primary_key=True)
     fund_id         = db.Column(db.Integer, db.ForeignKey("funds.id"), nullable=False)
-    donor_name      = db.Column(db.String(200), nullable=False)
+    donor_id        = db.Column(db.Integer, db.ForeignKey("donors.id"))
+    donor_name      = db.Column(db.String(200), nullable=False)  # Kept for display + backward compat
     amount          = db.Column(db.Numeric(18, 4), nullable=False)
     contribution_date = db.Column(db.Date, nullable=False)
     notes           = db.Column(db.Text)

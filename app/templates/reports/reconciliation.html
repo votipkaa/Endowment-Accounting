@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Reconciliation Report{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>Reconciliation Report</h2>
+</div>
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('reports.index') }}">Reports</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Reconciliation</li>
+  </ol>
+</nav>
+
+<!-- Filter Bar -->
+<div class="section-card mb-4">
+  <form method="GET" class="row g-3 align-items-end">
+    <div class="col-md-3">
+      <label for="year_select" class="form-label">Year</label>
+      <select id="year_select" name="year" class="form-select" onchange="this.form.submit()">
+        {% for y in range(2015, current_year + 2) %}
+          <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label for="month_select" class="form-label">Month</label>
+      <select id="month_select" name="month" class="form-select" onchange="this.form.submit()">
+        {% set months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] %}
+        {% for m in range(1, 13) %}
+          <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ months[m - 1] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if pools %}
+      <div class="col-md-3">
+        <label for="pool_filter" class="form-label">Pool</label>
+        <select id="pool_filter" name="pool_id" class="form-select" onchange="this.form.submit()">
+          <option value="">All Pools</option>
+          {% for pool in pools %}
+            <option value="{{ pool.id }}" {% if pool_filter == pool.id %}selected{% endif %}>{{ pool.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Pool Reconciliation Cards -->
+{% if pool_rows %}
+  {% for row in pool_rows %}
+    <div class="section-card mb-4">
+      <!-- Card Header -->
+      <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+        <h5 class="mb-0">{{ row.pool.name }}</h5>
+        <div>
+          {% if row.snap and row.snap.is_closed %}
+            <span class="badge bg-success">Closed</span>
+          {% else %}
+            <span class="badge bg-warning">Open</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Three Reconciliation Sections -->
+      <div class="row g-3 mb-4">
+        <!-- Value Reconciliation -->
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="label">Vehicle Ending Balances</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.vehicle_total_ending) }}</div>
+          </div>
+          <div class="stat-card mt-3">
+            <div class="label">Fund Total Value</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.fund_total_value) }}</div>
+          </div>
+          <div class="stat-card mt-3 {% if row.value_variance == 0 %}success{% else %}danger{% endif %}">
+            <div class="label">Variance</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.value_variance) }}</div>
+            <div class="sub">
+              {% if row.value_variance == 0 %}
+                <i class="bi bi-check-circle-fill text-success"></i> Balanced
+              {% else %}
+                <i class="bi bi-exclamation-triangle-fill text-danger"></i> Mismatch
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Additions Reconciliation -->
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="label">Vehicle Additions</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.vehicle_total_additions) }}</div>
+          </div>
+          <div class="stat-card mt-3">
+            <div class="label">Fund Contributions</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.fund_total_contributions) }}</div>
+          </div>
+          <div class="stat-card mt-3 {% if row.additions_variance == 0 %}success{% else %}danger{% endif %}">
+            <div class="label">Variance</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.additions_variance) }}</div>
+            <div class="sub">
+              {% if row.additions_variance == 0 %}
+                <i class="bi bi-check-circle-fill text-success"></i> Balanced
+              {% else %}
+                <i class="bi bi-exclamation-triangle-fill text-danger"></i> Mismatch
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Withdrawals Reconciliation -->
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="label">Vehicle Withdrawals</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.vehicle_total_withdrawals) }}</div>
+          </div>
+          <div class="stat-card mt-3">
+            <div class="label">Fund Distributions</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.fund_total_distributions) }}</div>
+          </div>
+          <div class="stat-card mt-3 {% if row.withdrawals_variance == 0 %}success{% else %}danger{% endif %}">
+            <div class="label">Variance</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.withdrawals_variance) }}</div>
+            <div class="sub">
+              {% if row.withdrawals_variance == 0 %}
+                <i class="bi bi-check-circle-fill text-success"></i> Balanced
+              {% else %}
+                <i class="bi bi-exclamation-triangle-fill text-danger"></i> Mismatch
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expandable Details Section -->
+      <div class="border-top pt-3">
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse"
+                data-bs-target="#details-{{ row.pool.id }}" aria-expanded="false">
+          <i class="bi bi-chevron-down"></i> Show Details
+        </button>
+
+        <div class="collapse mt-3" id="details-{{ row.pool.id }}">
+          <div class="row g-4">
+            <!-- Vehicles Table -->
+            <div class="col-md-6">
+              <h6 class="mb-3">Vehicles</h6>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                  <thead>
+                    <tr>
+                      <th>Vehicle</th>
+                      <th class="text-end">Ending Balance</th>
+                      <th class="text-end">Additions</th>
+                      <th class="text-end">Withdrawals</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for vehicle in row.vehicle_details %}
+                      <tr {% if not vehicle.has_data %}class="table-secondary"{% endif %}>
+                        <td>{{ vehicle.name }}</td>
+                        <td class="text-end text-money">${{ "{:,.2f}".format(vehicle.ending) }}</td>
+                        <td class="text-end text-money">${{ "{:,.2f}".format(vehicle.additions) }}</td>
+                        <td class="text-end text-money">${{ "{:,.2f}".format(vehicle.withdrawals) }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Funds Table -->
+            <div class="col-md-6">
+              <h6 class="mb-3">Funds</h6>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                  <thead>
+                    <tr>
+                      <th>Fund</th>
+                      <th class="text-end">Value</th>
+                      <th class="text-end">Contributions</th>
+                      <th class="text-end">Distributions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for fund in row.fund_details %}
+                      <tr>
+                        <td>{{ fund.name }}</td>
+                        <td class="text-end text-money">${{ "{:,.2f}".format(fund.value) }}</td>
+                        <td class="text-end text-money">${{ "{:,.2f}".format(fund.contributions) }}</td>
+                        <td class="text-end text-money">${{ "{:,.2f}".format(fund.distributions) }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="alert alert-info" role="alert">
+    <i class="bi bi-info-circle"></i> No reconciliation data available for the selected period.
+  </div>
+{% endif %}
+
+{% endblock %}

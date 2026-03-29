@@ -9,7 +9,7 @@ from datetime import datetime, date
 from models import (
     db, Fund, FundRestriction, FundContribution, FundMonthlySnapshot,
     Distribution, InvestmentPool, PoolMonthlySnapshot, AuditLog, AuditAction,
-    Document
+    Document, Donor
 )
 
 funds_bp = Blueprint("funds", __name__)
@@ -36,7 +36,7 @@ class FundForm(FlaskForm):
 
 
 class ContributionForm(FlaskForm):
-    donor_name          = StringField("Donor Name", validators=[DataRequired()])
+    donor_id            = SelectField("Donor", coerce=int, validators=[DataRequired()])
     amount              = DecimalField("Amount ($)", places=2, validators=[DataRequired(), NumberRange(min=0.01)])
     contribution_date   = DateField("Contribution Date", validators=[DataRequired()], default=date.today)
     buy_in_year         = SelectField("Buy-In Year", coerce=int, validators=[DataRequired()])
@@ -181,13 +181,22 @@ def new_contribution(fund_id):
     fund = Fund.query.get_or_404(fund_id)
     form = ContributionForm()
     current_year = datetime.utcnow().year
+    donors = Donor.query.filter_by(is_active=True).order_by(Donor.display_name).all()
+    form.donor_id.choices = [(0, "— Select a Donor —")] + [(d.id, d.display_name) for d in donors]
     form.buy_in_year.choices = [(y, str(y)) for y in range(current_year - 5, current_year + 2)]
-    form.buy_in_year.data = current_year
+    if request.method == "GET":
+        form.buy_in_year.data = current_year
 
     if form.validate_on_submit():
+        if form.donor_id.data == 0:
+            flash("Please select a donor. If this is a new donor, create them first.", "warning")
+            return render_template("funds/contribution_form.html", form=form, fund=fund,
+                                   current_year=current_year, donors=donors)
+        donor = Donor.query.get(form.donor_id.data)
         contrib = FundContribution(
             fund_id=fund_id,
-            donor_name=form.donor_name.data,
+            donor_id=donor.id,
+            donor_name=donor.display_name,
             amount=form.amount.data,
             contribution_date=form.contribution_date.data,
             buy_in_year=form.buy_in_year.data,
@@ -199,12 +208,13 @@ def new_contribution(fund_id):
         db.session.flush()
         db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.CREATE,
             entity_type="FundContribution", entity_id=contrib.id,
-            description=f"Added contribution of ${form.amount.data:,.2f} from '{form.donor_name.data}' to fund '{fund.name}'",
+            description=f"Added contribution of ${form.amount.data:,.2f} from '{donor.display_name}' to fund '{fund.name}'",
             ip_address=request.remote_addr))
         db.session.commit()
-        flash(f"Contribution of ${float(form.amount.data):,.2f} from {form.donor_name.data} added.", "success")
+        flash(f"Contribution of ${float(form.amount.data):,.2f} from {donor.display_name} added.", "success")
         return redirect(url_for("funds.detail", fund_id=fund_id))
-    return render_template("funds/contribution_form.html", form=form, fund=fund, current_year=current_year)
+    return render_template("funds/contribution_form.html", form=form, fund=fund,
+                           current_year=current_year, donors=donors)
 
 
 @funds_bp.route("/<int:fund_id>/contributions/<int:contrib_id>/void", methods=["POST"])

@@ -40,7 +40,29 @@
         </div>
 
         <hr class="my-3">
-        <p class="fw-semibold text-muted small text-uppercase mb-2">Activity This Period</p>
+        <p class="fw-semibold text-muted small text-uppercase mb-2">Cash Flows</p>
+
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label">Additions (Cash In)</label>
+            <div class="input-group">
+              <span class="input-group-text text-success">$</span>
+              {{ form.additions(class="form-control calc-field", id="additions", step="0.01") }}
+            </div>
+            <small class="text-muted">New money deposited / gifts invested</small>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Withdrawals (Cash Out)</label>
+            <div class="input-group">
+              <span class="input-group-text text-danger">$</span>
+              {{ form.withdrawals(class="form-control calc-field", id="withdrawals", step="0.01") }}
+            </div>
+            <small class="text-muted">Distributions / transfers out</small>
+          </div>
+        </div>
+
+        <hr class="my-3">
+        <p class="fw-semibold text-muted small text-uppercase mb-2">Investment Activity</p>
 
         <div class="row g-3 mb-3">
           <div class="col-6">
@@ -80,7 +102,7 @@
         <div class="section-card" style="background: #f8fafc; border: 2px solid #e2e8f0;">
           <label class="form-label fw-bold">Calculated Ending Balance</label>
           <div class="display-6 fw-bold text-money" id="calc_ending" style="color: #1e3a5f;">$0.00</div>
-          <small class="text-muted">Beginning Balance + Income − Expenses ± Gains/Losses</small>
+          <small class="text-muted">Beginning + Additions − Withdrawals + Income − Expenses ± Gains/Losses</small>
         </div>
 
         <div class="mb-4 mt-3">
@@ -104,12 +126,14 @@
 {% block scripts %}
 <script>
 function recalc() {
-  const beg  = parseFloat(document.getElementById('beg_bal').value)  || 0;
-  const exp  = parseFloat(document.getElementById('mgmt_exp').value) || 0;
-  const inc  = parseFloat(document.getElementById('int_div').value)  || 0;
-  const unrl = parseFloat(document.getElementById('unreal').value)   || 0;
-  const real = parseFloat(document.getElementById('real').value)     || 0;
-  const end  = beg - exp + inc + unrl + real;
+  const beg  = parseFloat(document.getElementById('beg_bal').value)      || 0;
+  const add  = parseFloat(document.getElementById('additions').value)    || 0;
+  const wth  = parseFloat(document.getElementById('withdrawals').value)  || 0;
+  const exp  = parseFloat(document.getElementById('mgmt_exp').value)     || 0;
+  const inc  = parseFloat(document.getElementById('int_div').value)      || 0;
+  const unrl = parseFloat(document.getElementById('unreal').value)       || 0;
+  const real = parseFloat(document.getElementById('real').value)         || 0;
+  const end  = beg + add - wth - exp + inc + unrl + real;
   const el   = document.getElementById('calc_ending');
   el.textContent = '$' + end.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
   el.style.color = end < 0 ? '#dc2626' : '#1e3a5f';

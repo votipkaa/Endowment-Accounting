@@ -15,10 +15,10 @@ import os
 import traceback
 
 from models import (
-    db, User, UserRole, FundRestriction, AuditAction,
+    db, User, UserRole, FundRestriction, DonorType, AuditAction,
     InvestmentPool, InvestmentVehicle, VehicleMonthlyActivity, PoolMonthlySnapshot,
     Fund, FundContribution, FundMonthlySnapshot,
-    Distribution, AuditLog
+    Distribution, Donor, AuditLog
 )
 
 # ─────────────────────────────────────────────
@@ -57,6 +57,7 @@ def create_app():
     from routes.reports import reports_bp
     from routes.admin import admin_bp
     from routes.documents import documents_bp
+    from routes.donors import donors_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(pools_bp, url_prefix="/pools")
@@ -65,6 +66,7 @@ def create_app():
     app.register_blueprint(reports_bp, url_prefix="/reports")
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(documents_bp, url_prefix="/documents")
+    app.register_blueprint(donors_bp, url_prefix="/donors")
 
     # Dashboard route
     @app.route("/")

@@ -148,6 +148,16 @@
   {% endfor %}
   {% endfor %}
 
+  <div class="nav-section">Donors</div>
+  <a href="{{ url_for('donors.index') }}" class="nav-link {% if request.endpoint in ['donors.index', 'donors.detail'] %}active{% endif %}">
+    <i class="bi bi-people-fill"></i> All Donors
+  </a>
+  {% if current_user.can_edit %}
+  <a href="{{ url_for('donors.new_donor') }}" class="nav-link {% if request.endpoint == 'donors.new_donor' %}active{% endif %}">
+    <i class="bi bi-person-plus"></i> New Donor
+  </a>
+  {% endif %}
+
   <div class="nav-section">Funds</div>
   <a href="{{ url_for('funds.index') }}" class="nav-link {% if request.endpoint in ['funds.index'] %}active{% endif %}">
     <i class="bi bi-wallet2"></i> All Funds
@@ -177,6 +187,9 @@
   </a>
   <a href="{{ url_for('reports.distributions_history') }}" class="nav-link {% if request.endpoint == 'reports.distributions_history' %}active{% endif %}">
     <i class="bi bi-clock-history"></i> Distribution History
+  </a>
+  <a href="{{ url_for('reports.reconciliation') }}" class="nav-link {% if request.endpoint == 'reports.reconciliation' %}active{% endif %}">
+    <i class="bi bi-arrow-left-right"></i> Reconciliation
   </a>
   <a href="{{ url_for('reports.audit') }}" class="nav-link {% if request.endpoint == 'reports.audit' %}active{% endif %}">
     <i class="bi bi-shield-check"></i> Audit Log

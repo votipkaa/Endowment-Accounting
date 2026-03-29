@@ -26,9 +26,17 @@
         {{ form.hidden_tag() }}
         <div class="row g-3">
           <div class="col-12">
-            {{ form.donor_name.label(class="form-label") }}
-            {{ form.donor_name(class="form-control", placeholder="Full name of donor or organization") }}
-            {% for e in form.donor_name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            <label class="form-label">Donor</label>
+            <div class="d-flex gap-2 align-items-start">
+              <div class="flex-grow-1">
+                {{ form.donor_id(class="form-select") }}
+                {% for e in form.donor_id.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+              </div>
+              <a href="{{ url_for('donors.new_donor') }}?next={{ request.url }}"
+                 class="btn btn-outline-success flex-shrink-0" title="Create new donor">
+                <i class="bi bi-person-plus"></i> New Donor
+              </a>
+            </div>
           </div>
           <div class="col-6">
             {{ form.amount.label(class="form-label") }}

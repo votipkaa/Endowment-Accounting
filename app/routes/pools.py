@@ -29,6 +29,8 @@ class VehicleForm(FlaskForm):
 
 class ActivityForm(FlaskForm):
     beginning_balance   = DecimalField("Beginning Balance", places=2, validators=[Optional()], default=0)
+    additions           = DecimalField("Additions (Cash In)", places=2, validators=[Optional()], default=0)
+    withdrawals         = DecimalField("Withdrawals (Cash Out)", places=2, validators=[Optional()], default=0)
     management_expenses = DecimalField("Management / Admin Expenses", places=2, validators=[Optional()], default=0)
     interest_dividends  = DecimalField("Interest & Dividend Income", places=2, validators=[Optional()], default=0)
     unrealized_gains    = DecimalField("Unrealized Gains (Losses)", places=2, validators=[Optional()], default=0)
@@ -162,6 +164,8 @@ def enter_activity(pool_id, vehicle_id, year, month):
             db.session.add(existing)
 
         existing.beginning_balance   = form.beginning_balance.data or 0
+        existing.additions           = form.additions.data or 0
+        existing.withdrawals         = form.withdrawals.data or 0
         existing.management_expenses = form.management_expenses.data or 0
         existing.interest_dividends  = form.interest_dividends.data or 0
         existing.unrealized_gains    = form.unrealized_gains.data or 0
@@ -170,6 +174,8 @@ def enter_activity(pool_id, vehicle_id, year, month):
         # Auto-calc ending balance
         existing.ending_balance = (
             (existing.beginning_balance or 0)
+            + (existing.additions or 0)
+            - (existing.withdrawals or 0)
             + (existing.interest_dividends or 0)
             + (existing.unrealized_gains or 0)
             + (existing.realized_gains or 0)
@@ -343,6 +349,8 @@ def vehicle_detail(pool_id, vehicle_id):
     cum_unrealized   = Decimal("0")
     cum_realized     = Decimal("0")
     cum_net_activity = Decimal("0")
+    cum_additions    = Decimal("0")
+    cum_withdrawals  = Decimal("0")
 
     for act in all_activity:
         cum_expenses     += Decimal(str(act.management_expenses or 0))
@@ -350,6 +358,8 @@ def vehicle_detail(pool_id, vehicle_id):
         cum_unrealized   += Decimal(str(act.unrealized_gains or 0))
         cum_realized     += Decimal(str(act.realized_gains or 0))
         cum_net_activity += Decimal(str(act.net_activity or 0))
+        cum_additions    += Decimal(str(act.additions or 0))
+        cum_withdrawals  += Decimal(str(act.withdrawals or 0))
 
         # Is this month's pool snapshot closed?
         pool_snap = PoolMonthlySnapshot.query.filter_by(
@@ -364,6 +374,8 @@ def vehicle_detail(pool_id, vehicle_id):
             "cum_unrealized":   cum_unrealized,
             "cum_realized":     cum_realized,
             "cum_net_activity": cum_net_activity,
+            "cum_additions":    cum_additions,
+            "cum_withdrawals":  cum_withdrawals,
         })
 
     # Reverse for display (newest first), but keep cumulative values

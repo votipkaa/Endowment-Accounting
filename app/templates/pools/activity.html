@@ -80,6 +80,8 @@
         <tr>
           <th>Vehicle</th>
           <th class="text-end">Beg. Balance</th>
+          <th class="text-end">Additions</th>
+          <th class="text-end">Withdrawals</th>
           <th class="text-end">Mgmt Exp.</th>
           <th class="text-end">Interest/Div.</th>
           <th class="text-end">Unrealized G/L</th>
@@ -96,6 +98,8 @@
           <td class="fw-semibold">{{ v.name }}</td>
           {% if act and not act.is_voided %}
             <td class="text-end text-money">${{ "{:,.2f}".format(act.beginning_balance or 0) }}</td>
+            <td class="text-end text-money text-success">${{ "{:,.2f}".format(act.additions or 0) }}</td>
+            <td class="text-end text-money text-danger">${{ "{:,.2f}".format(act.withdrawals or 0) }}</td>
             <td class="text-end text-money text-danger">${{ "{:,.2f}".format(act.management_expenses or 0) }}</td>
             <td class="text-end text-money text-success">${{ "{:,.2f}".format(act.interest_dividends or 0) }}</td>
             <td class="text-end text-money {% if (act.unrealized_gains or 0) < 0 %}text-danger{% endif %}">${{ "{:,.2f}".format(act.unrealized_gains or 0) }}</td>
@@ -109,7 +113,7 @@
               {% endif %}
             </td>
           {% else %}
-            <td colspan="6" class="text-muted text-center fst-italic">No data entered</td>
+            <td colspan="8" class="text-muted text-center fst-italic">No data entered</td>
             <td class="text-center"><span class="badge bg-secondary rounded-pill">Not entered</span></td>
           {% endif %}
           <td class="text-end">
@@ -148,6 +152,12 @@
           <td>POOL TOTAL</td>
           <td class="text-end text-money">
             ${{ "{:,.2f}".format(activity.values() | selectattr('beginning_balance') | map(attribute='beginning_balance') | map('float') | sum) }}
+          </td>
+          <td class="text-end text-money text-success">
+            ${{ "{:,.2f}".format(activity.values() | selectattr('additions') | map(attribute='additions') | map('float') | sum) }}
+          </td>
+          <td class="text-end text-money text-danger">
+            ${{ "{:,.2f}".format(activity.values() | selectattr('withdrawals') | map(attribute='withdrawals') | map('float') | sum) }}
           </td>
           <td class="text-end text-money text-danger">
             ${{ "{:,.2f}".format(activity.values() | selectattr('management_expenses') | map(attribute='management_expenses') | map('float') | sum) }}

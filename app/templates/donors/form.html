@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('donors.index') }}">Donors</a></li>
+  <li class="breadcrumb-item active">{{ title }}</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header"><h2>{{ title }}</h2></div>
+
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-7">
+    <form method="POST">
+      {{ csrf_token() }}
+
+      <!-- Donor Type & Name -->
+      <div class="section-card">
+        <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-info-circle me-2"></i>Donor Type & Name</h6>
+
+        <div class="mb-3">
+          {{ form.donor_type.label(class="form-label") }}
+          {{ form.donor_type(class="form-select", id="donorTypeSelect") }}
+          {% if form.donor_type.errors %}
+            {% for e in form.donor_type.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+          {% endif %}
+        </div>
+
+        <!-- Individual Fields -->
+        <div id="individualFields" class="row g-3 mb-3">
+          <div class="col-6">
+            {{ form.first_name.label(class="form-label") }}
+            {{ form.first_name(class="form-control") }}
+            {% if form.first_name.errors %}
+              {% for e in form.first_name.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            {% endif %}
+          </div>
+          <div class="col-6">
+            {{ form.last_name.label(class="form-label") }}
+            {{ form.last_name(class="form-control") }}
+            {% if form.last_name.errors %}
+              {% for e in form.last_name.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Organization Field -->
+        <div id="organizationField" class="mb-3" style="display:none">
+          {{ form.organization.label(class="form-label") }}
+          {{ form.organization(class="form-control") }}
+          {% if form.organization.errors %}
+            {% for e in form.organization.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+          {% endif %}
+        </div>
+
+        <!-- Display Name (Required) -->
+        <div class="mb-0">
+          {{ form.display_name.label(class="form-label") }}
+          {{ form.display_name(class="form-control", placeholder="How this donor will appear in the system") }}
+          {% if form.display_name.errors %}
+            {% for e in form.display_name.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Contact Information -->
+      <div class="section-card">
+        <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-envelope me-2"></i>Contact Information</h6>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            {{ form.email.label(class="form-label") }}
+            {{ form.email(class="form-control", type="email") }}
+            {% if form.email.errors %}
+              {% for e in form.email.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            {% endif %}
+          </div>
+          <div class="col-md-6">
+            {{ form.email_secondary.label(class="form-label") }}
+            {{ form.email_secondary(class="form-control", type="email") }}
+            {% if form.email_secondary.errors %}
+              {% for e in form.email_secondary.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="row g-3 mb-0">
+          <div class="col-md-6">
+            {{ form.phone.label(class="form-label") }}
+            {{ form.phone(class="form-control", type="tel") }}
+            {% if form.phone.errors %}
+              {% for e in form.phone.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            {% endif %}
+          </div>
+          <div class="col-md-6">
+            {{ form.phone_secondary.label(class="form-label") }}
+            {{ form.phone_secondary(class="form-control", type="tel") }}
+            {% if form.phone_secondary.errors %}
+              {% for e in form.phone_secondary.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Address -->
+      <div class="section-card">
+        <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-geo-alt me-2"></i>Address</h6>
+
+        <div class="mb-3">
+          {{ form.address_line1.label(class="form-label") }}
+          {{ form.address_line1(class="form-control") }}
+          {% if form.address_line1.errors %}
+            {% for e in form.address_line1.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          {{ form.address_line2.label(class="form-label") }}
+          {{ form.address_line2(class="form-control", placeholder="Apartment, suite, etc. (optional)") }}
+          {% if form.address_line2.errors %}
+            {% for e in form.address_line2.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+          {% endif %}
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            {{ form.city.label(class="form-label") }}
+            {{ form.city(class="form-control") }}
+            {% if form.city.errors %}
+              {% for e in form.city.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            {% endif %}
+          </div>
+          <div class="col-md-2">
+            {{ form.state.label(class="form-label") }}
+            {{ form.state(class="form-control", placeholder="State") }}
+            {% if form.state.errors %}
+              {% for e in form.state.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            {% endif %}
+          </div>
+          <div class="col-md-4">
+            {{ form.zip_code.label(class="form-label") }}
+            {{ form.zip_code(class="form-control", placeholder="ZIP code") }}
+            {% if form.zip_code.errors %}
+              {% for e in form.zip_code.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="mb-0">
+          {{ form.country.label(class="form-label") }}
+          {{ form.country(class="form-control", placeholder="USA") }}
+          {% if form.country.errors %}
+            {% for e in form.country.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="section-card">
+        <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-sticky me-2"></i>Notes</h6>
+
+        {{ form.notes(class="form-control", rows="4", placeholder="Add any additional notes about this donor...") }}
+        {% if form.notes.errors %}
+          {% for e in form.notes.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+        {% endif %}
+      </div>
+
+      <!-- Actions -->
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-circle me-1"></i> Save Donor
+        </button>
+        <a href="{{ url_for('donors.index') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const donorTypeSelect = document.getElementById('donorTypeSelect');
+const individualFields = document.getElementById('individualFields');
+const organizationField = document.getElementById('organizationField');
+
+function updateFields() {
+  const value = donorTypeSelect.value;
+  if (value === 'individual') {
+    individualFields.style.display = 'flex';
+    organizationField.style.display = 'none';
+  } else {
+    individualFields.style.display = 'none';
+    organizationField.style.display = 'block';
+  }
+}
+
+donorTypeSelect.addEventListener('change', updateFields);
+updateFields();
+</script>
+{% endblock %}
