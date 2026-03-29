@@ -5,6 +5,7 @@ Endowment Accounting Software — Main Application
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf import FlaskForm
+from flask_wtf.csrf import CSRFProtect
 from wtforms import StringField, PasswordField, SelectField, DecimalField, DateField, TextAreaField, BooleanField, IntegerField
 from wtforms.validators import DataRequired, Email, Optional, NumberRange
 from sqlalchemy import func
@@ -38,6 +39,7 @@ def create_app():
     app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload limit
 
     db.init_app(app)
+    CSRFProtect(app)
 
     login_manager = LoginManager(app)
     login_manager.login_view = "auth.login"
