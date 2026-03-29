@@ -95,10 +95,21 @@ def create_app():
     # Audit helper — accessible from all routes
     @app.context_processor
     def inject_helpers():
+        sidebar_pools = []
+        try:
+            from flask_login import current_user as cu
+            if cu.is_authenticated:
+                sidebar_pools = (InvestmentPool.query
+                                 .filter_by(is_active=True)
+                                 .order_by(InvestmentPool.name)
+                                 .all())
+        except Exception:
+            pass
         return dict(
             UserRole=UserRole,
             FundRestriction=FundRestriction,
             now=datetime.utcnow(),
+            sidebar_pools=sidebar_pools,
         )
 
     # Create tables and seed admin on first run

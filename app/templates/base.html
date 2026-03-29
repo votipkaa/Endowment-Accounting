@@ -41,6 +41,20 @@
       background: rgba(255,255,255,0.12); color: #fff;
     }
     #sidebar .nav-link i { font-size: 1rem; width: 1.2rem; }
+    #sidebar .nav-vehicle {
+      color: rgba(255,255,255,0.65); padding: .3rem 1rem .3rem 2.4rem;
+      border-radius: 6px; margin: 1px 8px; font-size: 0.8rem;
+      display: flex; align-items: center; gap: 0.4rem;
+      text-decoration: none;
+    }
+    #sidebar .nav-vehicle:hover { background: rgba(255,255,255,0.10); color: #fff; }
+    #sidebar .nav-vehicle.active { background: rgba(255,255,255,0.10); color: #fff; }
+    #sidebar .nav-pool-name {
+      color: rgba(255,255,255,0.75); padding: .35rem 1rem .2rem 1rem;
+      font-size: 0.78rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem;
+      cursor: pointer; border-radius: 6px; margin: 1px 8px;
+    }
+    #sidebar .nav-pool-name:hover { background: rgba(255,255,255,0.08); }
     #sidebar .sidebar-footer {
       margin-top: auto; border-top: 1px solid rgba(255,255,255,0.12);
       padding: 0.75rem 1rem;
@@ -115,9 +129,24 @@
   </a>
 
   <div class="nav-section">Investments</div>
-  <a href="{{ url_for('pools.index') }}" class="nav-link {% if 'pools' in request.endpoint %}active{% endif %}">
+  <a href="{{ url_for('pools.index') }}" class="nav-link {% if request.endpoint == 'pools.index' %}active{% endif %}">
     <i class="bi bi-layers"></i> Investment Pools
   </a>
+
+  {% for pool in sidebar_pools %}
+  {# Pool row — click to go to pool detail #}
+  <a href="{{ url_for('pools.detail', pool_id=pool.id) }}"
+     class="nav-pool-name {% if request.endpoint == 'pools.detail' and request.view_args.get('pool_id') == pool.id %}active{% endif %}">
+    <i class="bi bi-chevron-right" style="font-size:.65rem;opacity:.5"></i>{{ pool.name }}
+  </a>
+  {# Vehicles under this pool #}
+  {% for v in pool.vehicles.filter_by(is_active=True).all() %}
+  <a href="{{ url_for('pools.vehicle_detail', pool_id=pool.id, vehicle_id=v.id) }}"
+     class="nav-vehicle {% if request.endpoint == 'pools.vehicle_detail' and request.view_args.get('vehicle_id') == v.id %}active{% endif %}">
+    <i class="bi bi-briefcase"></i>{{ v.name }}
+  </a>
+  {% endfor %}
+  {% endfor %}
 
   <div class="nav-section">Funds</div>
   <a href="{{ url_for('funds.index') }}" class="nav-link {% if request.endpoint in ['funds.index'] %}active{% endif %}">
