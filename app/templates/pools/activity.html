@@ -67,9 +67,24 @@
 </div>
 {% elif current_user.can_approve %}
 <div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
-  <span><i class="bi bi-info-circle me-1"></i> No activity entered yet for this period. Enter vehicle activity below, then close the month.</span>
+  <span><i class="bi bi-info-circle me-1"></i> Enter vehicle activity below, then close the month to allocate earnings across funds.</span>
+  <form method="POST" action="{{ url_for('pools.close_month', pool_id=pool.id, year=year, month=month) }}"
+        onsubmit="return confirm('Close {{ month_names[month-1] }} {{ year }}? This will calculate unit prices and spread earnings across all funds in this pool.')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-success btn-sm"><i class="bi bi-lock me-1"></i> Close Month & Allocate Earnings</button>
+  </form>
 </div>
 {% endif %}
+
+<!-- Workflow Guide -->
+<div class="alert alert-light border mb-4">
+  <h6 class="fw-bold mb-2"><i class="bi bi-info-circle me-2"></i>Monthly Workflow</h6>
+  <ol class="mb-0 small">
+    <li><strong>Enter Activity</strong> — For each vehicle, enter the beginning balance, additions, withdrawals, income, gains, and expenses from the brokerage statement.</li>
+    <li><strong>Approve Activity</strong> — Admin approves each vehicle's numbers are correct.</li>
+    <li><strong>Close Month</strong> — Click "Close Month & Allocate Earnings" above. This calculates the unit price and automatically spreads earnings across all funds in this pool based on each fund's unit ownership.</li>
+  </ol>
+</div>
 
 <!-- Vehicle Activity Table -->
 <div class="card">

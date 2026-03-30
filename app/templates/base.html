@@ -168,6 +168,11 @@
   </a>
   {% endif %}
 
+  <div class="nav-section">Contributions</div>
+  <a href="{{ url_for('funds.all_contributions') }}" class="nav-link {% if request.endpoint == 'funds.all_contributions' %}active{% endif %}">
+    <i class="bi bi-gift"></i> All Contributions
+  </a>
+
   <div class="nav-section">Distributions</div>
   <a href="{{ url_for('distributions.index') }}" class="nav-link {% if 'distributions' in request.endpoint %}active{% endif %}">
     <i class="bi bi-cash-stack"></i> Distributions

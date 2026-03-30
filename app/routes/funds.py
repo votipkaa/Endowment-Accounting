@@ -1,15 +1,17 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
+from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, TextAreaField, DecimalField, DateField, SelectField, BooleanField
 from wtforms.validators import DataRequired, Optional, NumberRange
 from decimal import Decimal
 from datetime import datetime, date
+import io
 
 from models import (
     db, Fund, FundRestriction, FundContribution, FundMonthlySnapshot,
     Distribution, InvestmentPool, PoolMonthlySnapshot, AuditLog, AuditAction,
-    Document, Donor
+    Document, Donor, GiftType
 )
 
 funds_bp = Blueprint("funds", __name__)
@@ -37,12 +39,27 @@ class FundForm(FlaskForm):
 
 class ContributionForm(FlaskForm):
     donor_id            = SelectField("Donor", coerce=int, validators=[DataRequired()])
+    gift_type           = SelectField("Gift Type", validators=[DataRequired()],
+                            choices=[
+                                ("cash", "Cash"),
+                                ("check", "Check"),
+                                ("wire", "Wire Transfer"),
+                                ("stock", "Stock / Securities"),
+                                ("real_estate", "Real Estate"),
+                                ("in_kind", "In-Kind"),
+                                ("pledge", "Pledge"),
+                                ("bequest", "Bequest"),
+                                ("other", "Other"),
+                            ])
     amount              = DecimalField("Amount ($)", places=2, validators=[DataRequired(), NumberRange(min=0.01)])
     contribution_date   = DateField("Contribution Date", validators=[DataRequired()], default=date.today)
     buy_in_year         = SelectField("Buy-In Year", coerce=int, validators=[DataRequired()])
     buy_in_month        = SelectField("Buy-In Month", coerce=int, validators=[DataRequired()],
                             choices=[(i, datetime(2000, i, 1).strftime("%B")) for i in range(1, 13)])
     notes               = TextAreaField("Notes", validators=[Optional()])
+    document            = FileField("Attach Document", validators=[
+                            FileAllowed(["pdf", "doc", "docx", "xls", "xlsx", "jpg", "jpeg", "png", "gif", "tif", "tiff"],
+                                        "Allowed: PDF, Word, Excel, Images")])
 
 
 # ── Fund CRUD ──────────────────────────────────
@@ -197,6 +214,7 @@ def new_contribution(fund_id):
             fund_id=fund_id,
             donor_id=donor.id,
             donor_name=donor.display_name,
+            gift_type=GiftType(form.gift_type.data),
             amount=form.amount.data,
             contribution_date=form.contribution_date.data,
             buy_in_year=form.buy_in_year.data,
@@ -206,9 +224,28 @@ def new_contribution(fund_id):
         )
         db.session.add(contrib)
         db.session.flush()
+
+        # Handle document upload
+        if form.document.data:
+            f = form.document.data
+            doc = Document(
+                entity_type="contribution",
+                entity_id=contrib.id,
+                filename=f.filename,
+                description=f"Gift document for {donor.display_name} — ${float(form.amount.data):,.2f}",
+                mime_type=f.content_type,
+                file_data=f.read(),
+                file_size=f.content_length or 0,
+                uploaded_by_id=current_user.id,
+            )
+            # Get file size from data if content_length is 0
+            if not doc.file_size:
+                doc.file_size = len(doc.file_data)
+            db.session.add(doc)
+
         db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.CREATE,
             entity_type="FundContribution", entity_id=contrib.id,
-            description=f"Added contribution of ${form.amount.data:,.2f} from '{donor.display_name}' to fund '{fund.name}'",
+            description=f"Added {form.gift_type.data} contribution of ${form.amount.data:,.2f} from '{donor.display_name}' to fund '{fund.name}'",
             ip_address=request.remote_addr))
         db.session.commit()
         flash(f"Contribution of ${float(form.amount.data):,.2f} from {donor.display_name} added.", "success")
@@ -233,3 +270,62 @@ def void_contribution(fund_id, contrib_id):
     db.session.commit()
     flash("Contribution voided.", "warning")
     return redirect(url_for("funds.detail", fund_id=fund_id))
+
+
+# ── All Contributions (global view) ──────────
+
+@funds_bp.route("/contributions")
+@login_required
+def all_contributions():
+    """List all contributions across all funds with filters."""
+    pool_filter = request.args.get("pool_id", type=int)
+    fund_filter = request.args.get("fund_id", type=int)
+    donor_filter = request.args.get("donor_id", type=int)
+    gift_type_filter = request.args.get("gift_type")
+    year_filter = request.args.get("year", type=int)
+
+    query = FundContribution.query.filter_by(is_voided=False)
+    if fund_filter:
+        query = query.filter_by(fund_id=fund_filter)
+    if donor_filter:
+        query = query.filter_by(donor_id=donor_filter)
+    if gift_type_filter:
+        query = query.filter_by(gift_type=gift_type_filter)
+    if pool_filter:
+        fund_ids = [f.id for f in Fund.query.filter_by(pool_id=pool_filter).all()]
+        query = query.filter(FundContribution.fund_id.in_(fund_ids))
+    if year_filter:
+        query = query.filter(db.extract("year", FundContribution.contribution_date) == year_filter)
+
+    contributions = query.order_by(FundContribution.contribution_date.desc()).all()
+    total = sum(Decimal(str(c.amount)) for c in contributions)
+
+    pools = InvestmentPool.query.filter_by(is_active=True).order_by(InvestmentPool.name).all()
+    funds = Fund.query.filter_by(is_active=True).order_by(Fund.name).all()
+    donors = Donor.query.filter_by(is_active=True).order_by(Donor.display_name).all()
+
+    return render_template("funds/all_contributions.html",
+        contributions=contributions,
+        total=total,
+        pools=pools, funds=funds, donors=donors,
+        pool_filter=pool_filter, fund_filter=fund_filter,
+        donor_filter=donor_filter, gift_type_filter=gift_type_filter,
+        year_filter=year_filter,
+        GiftType=GiftType,
+    )
+
+
+# ── Contribution Document Download ───────────
+
+@funds_bp.route("/contributions/<int:contrib_id>/document/<int:doc_id>")
+@login_required
+def download_contribution_doc(contrib_id, doc_id):
+    """Download a document attached to a contribution."""
+    doc = Document.query.filter_by(id=doc_id, entity_type="contribution",
+                                    entity_id=contrib_id, is_deleted=False).first_or_404()
+    return send_file(
+        io.BytesIO(doc.file_data),
+        mimetype=doc.mime_type,
+        as_attachment=True,
+        download_name=doc.filename,
+    )

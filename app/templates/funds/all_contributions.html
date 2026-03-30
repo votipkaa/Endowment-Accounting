@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}All Contributions{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Home</a></li>
+  <li class="breadcrumb-item active">All Contributions</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <h2>All Contributions</h2>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="label">Total Contributions</div>
+      <div class="value text-money">${{ "{:,.2f}".format(total) }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card accent">
+      <div class="label">Number of Gifts</div>
+      <div class="value">{{ contributions|length }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card success">
+      <div class="label">Average Gift</div>
+      <div class="value text-money">${{ "{:,.2f}".format((total / contributions|length) if contributions|length > 0 else 0) }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="section-card mb-4">
+  <form method="GET" class="row g-3 align-items-end">
+    <div class="col-md-2">
+      <label for="pool_filter" class="form-label">Pool</label>
+      <select id="pool_filter" name="pool_id" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All Pools</option>
+        {% for pool in pools %}
+          <option value="{{ pool.id }}" {% if pool_filter == pool.id %}selected{% endif %}>{{ pool.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="fund_filter" class="form-label">Fund</label>
+      <select id="fund_filter" name="fund_id" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All Funds</option>
+        {% for fund in funds %}
+          <option value="{{ fund.id }}" {% if fund_filter == fund.id %}selected{% endif %}>{{ fund.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="donor_filter" class="form-label">Donor</label>
+      <select id="donor_filter" name="donor_id" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All Donors</option>
+        {% for donor in donors %}
+          <option value="{{ donor.id }}" {% if donor_filter == donor.id %}selected{% endif %}>{{ donor.display_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="gift_type_filter" class="form-label">Gift Type</label>
+      <select id="gift_type_filter" name="gift_type" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All Types</option>
+        <option value="cash" {% if gift_type_filter == 'cash' %}selected{% endif %}>Cash</option>
+        <option value="check" {% if gift_type_filter == 'check' %}selected{% endif %}>Check</option>
+        <option value="wire" {% if gift_type_filter == 'wire' %}selected{% endif %}>Wire Transfer</option>
+        <option value="stock" {% if gift_type_filter == 'stock' %}selected{% endif %}>Stock / Securities</option>
+        <option value="real_estate" {% if gift_type_filter == 'real_estate' %}selected{% endif %}>Real Estate</option>
+        <option value="in_kind" {% if gift_type_filter == 'in_kind' %}selected{% endif %}>In-Kind</option>
+        <option value="pledge" {% if gift_type_filter == 'pledge' %}selected{% endif %}>Pledge</option>
+        <option value="bequest" {% if gift_type_filter == 'bequest' %}selected{% endif %}>Bequest</option>
+        <option value="other" {% if gift_type_filter == 'other' %}selected{% endif %}>Other</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="year_filter" class="form-label">Year</label>
+      <select id="year_filter" name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All Years</option>
+        {% for y in range(2015, 2028) %}
+          <option value="{{ y }}" {% if year_filter == y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      {% if pool_filter or fund_filter or donor_filter or gift_type_filter or year_filter %}
+        <a href="{{ url_for('funds.all_contributions') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-x-circle"></i> Clear Filters
+        </a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Contributions Table -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6>Contributions</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Donor</th>
+          <th>Fund</th>
+          <th>Gift Type</th>
+          <th class="text-end">Amount</th>
+          <th>Buy-In</th>
+          <th>Doc</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in contributions %}
+        <tr>
+          <td>{{ c.contribution_date.strftime("%m/%d/%Y") }}</td>
+          <td>
+            {% if c.donor %}
+              <a href="{{ url_for('donors.detail', donor_id=c.donor.id) }}">{{ c.donor_name }}</a>
+            {% else %}
+              {{ c.donor_name }}
+            {% endif %}
+          </td>
+          <td><a href="{{ url_for('funds.detail', fund_id=c.fund_id) }}">{{ c.fund.name }}</a></td>
+          <td>
+            {% if c.gift_type %}
+              <span class="badge bg-light text-dark">{{ c.gift_type.value.replace('_', ' ').title() }}</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="text-end text-money">${{ "{:,.2f}".format(c.amount) }}</td>
+          <td class="small text-muted">
+            {% if c.buy_in_year and c.buy_in_month %}
+              {{ c.buy_in_year }}-{{ "%02d"|format(c.buy_in_month) }}
+              {% if c.units_purchased %}
+                <br><span class="text-success">{{ "{:,.4f}".format(c.units_purchased) }} units</span>
+              {% endif %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            {% set docs = [] %}
+            {# We'll show a doc icon if there's an attached document #}
+            <span class="text-muted">—</span>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not contributions %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No contributions found matching the selected filters.</td></tr>
+        {% endif %}
+      </tbody>
+      {% if contributions %}
+      <tfoot>
+        <tr class="fw-bold">
+          <td colspan="4">Total</td>
+          <td class="text-end text-money">${{ "{:,.2f}".format(total) }}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}

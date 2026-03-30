@@ -216,4 +216,5 @@ def reconciliation():
         pools=pools,
         pool_filter=pool_filter,
         year=year, month=month,
+        current_year=datetime.utcnow().year,
     )

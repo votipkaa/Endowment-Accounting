@@ -21,6 +21,17 @@ class FundRestriction(str, enum.Enum):
     TEMPORARILY_RESTRICTED  = "temporarily_restricted"
     UNRESTRICTED            = "unrestricted"
 
+class GiftType(str, enum.Enum):
+    CASH        = "cash"
+    CHECK       = "check"
+    WIRE        = "wire"
+    STOCK       = "stock"
+    REAL_ESTATE = "real_estate"
+    IN_KIND     = "in_kind"
+    PLEDGE      = "pledge"
+    BEQUEST     = "bequest"
+    OTHER       = "other"
+
 class AuditAction(str, enum.Enum):
     CREATE  = "create"
     UPDATE  = "update"
@@ -315,6 +326,7 @@ class FundContribution(db.Model):
     fund_id         = db.Column(db.Integer, db.ForeignKey("funds.id"), nullable=False)
     donor_id        = db.Column(db.Integer, db.ForeignKey("donors.id"))
     donor_name      = db.Column(db.String(200), nullable=False)  # Kept for display + backward compat
+    gift_type       = db.Column(db.Enum(GiftType), default=GiftType.CHECK)
     amount          = db.Column(db.Numeric(18, 4), nullable=False)
     contribution_date = db.Column(db.Date, nullable=False)
     notes           = db.Column(db.Text)

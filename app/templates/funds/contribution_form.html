@@ -22,7 +22,7 @@
         Units are purchased at the <em>end-of-month closing unit price</em> for the selected Buy-In month.
         The fund begins participating in pool earnings the <em>following month</em>.
       </div>
-      <form method="POST">
+      <form method="POST" enctype="multipart/form-data">
         {{ form.hidden_tag() }}
         <div class="row g-3">
           <div class="col-12">
@@ -38,7 +38,12 @@
               </a>
             </div>
           </div>
-          <div class="col-6">
+          <div class="col-4">
+            {{ form.gift_type.label(class="form-label") }}
+            {{ form.gift_type(class="form-select") }}
+            {% for e in form.gift_type.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-4">
             {{ form.amount.label(class="form-label") }}
             <div class="input-group">
               <span class="input-group-text">$</span>
@@ -46,7 +51,7 @@
             </div>
             {% for e in form.amount.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
-          <div class="col-6">
+          <div class="col-4">
             {{ form.contribution_date.label(class="form-label") }}
             {{ form.contribution_date(class="form-control", type="date") }}
           </div>
@@ -65,6 +70,13 @@
           <div class="col-6">
             {{ form.buy_in_month.label(class="form-label") }}
             {{ form.buy_in_month(class="form-select") }}
+          </div>
+          <div class="col-12">
+            <hr>
+            <p class="fw-bold text-muted small text-uppercase mb-2">Supporting Document</p>
+            {{ form.document(class="form-control") }}
+            <div class="form-text">Attach a gift letter, receipt, check image, or other supporting document (PDF, Word, Excel, Images).</div>
+            {% for e in form.document.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
           <div class="col-12">
             {{ form.notes.label(class="form-label") }}
