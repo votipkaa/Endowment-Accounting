@@ -1,13 +1,14 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
-from wtforms import DecimalField, DateField, TextAreaField, SelectField, StringField
+from wtforms import DecimalField, DateField, TextAreaField, SelectField
 from wtforms.validators import DataRequired, Optional, NumberRange
 from decimal import Decimal
 from datetime import datetime, date
 
 from models import (
-    db, Fund, Distribution, AuditLog, AuditAction, FundRestriction, InvestmentPool
+    db, Fund, Distribution, AuditLog, AuditAction, FundRestriction, InvestmentPool,
+    PoolMonthlySnapshot
 )
 
 distributions_bp = Blueprint("distributions", __name__)
@@ -17,7 +18,6 @@ class DistributionForm(FlaskForm):
     fund_id             = SelectField("Fund", coerce=int, validators=[DataRequired()])
     amount              = DecimalField("Amount ($)", places=2, validators=[DataRequired(), NumberRange(min=0.01)])
     distribution_date   = DateField("Distribution Date", validators=[DataRequired()], default=date.today)
-    recipient           = StringField("Recipient / Payee", validators=[Optional()])
     purpose             = TextAreaField("Purpose / Description", validators=[Optional()])
     notes               = TextAreaField("Internal Notes", validators=[Optional()])
 
@@ -63,6 +63,22 @@ def new_distribution(fund_id=None):
             flash("Invalid fund selected.", "danger")
             return render_template("distributions/form.html", form=form, funds=funds, selected_fund=None)
 
+        # Block distributions to a closed month
+        dist_date = form.distribution_date.data
+        closed_snap = PoolMonthlySnapshot.query.filter_by(
+            pool_id=target_fund.pool_id,
+            year=dist_date.year,
+            month=dist_date.month,
+            is_closed=True
+        ).first()
+        if closed_snap:
+            flash(
+                f"Cannot record a distribution in {dist_date.strftime('%B %Y')} — that month is already closed. "
+                f"Reopen the month first, or use a date in an open month.",
+                "danger"
+            )
+            return render_template("distributions/form.html", form=form, funds=funds, selected_fund=target_fund)
+
         # Validation checks
         amt = Decimal(str(form.amount.data))
         current_val = Decimal(str(target_fund.current_value))
@@ -79,7 +95,6 @@ def new_distribution(fund_id=None):
             fund_id=form.fund_id.data,
             amount=form.amount.data,
             distribution_date=form.distribution_date.data,
-            recipient=form.recipient.data,
             purpose=form.purpose.data,
             notes=form.notes.data,
             created_by_id=current_user.id,

@@ -14,6 +14,13 @@ from models import (
     Document, Donor, GiftType
 )
 
+
+def _month_is_closed(pool_id, year, month):
+    """Return True if the given pool/year/month snapshot is already closed."""
+    snap = PoolMonthlySnapshot.query.filter_by(
+        pool_id=pool_id, year=year, month=month, is_closed=True).first()
+    return snap is not None
+
 funds_bp = Blueprint("funds", __name__)
 
 
@@ -209,6 +216,19 @@ def new_contribution(fund_id):
             flash("Please select a donor. If this is a new donor, create them first.", "warning")
             return render_template("funds/contribution_form.html", form=form, fund=fund,
                                    current_year=current_year, donors=donors)
+
+        # Block contributions to a closed buy-in month
+        if _month_is_closed(fund.pool_id, form.buy_in_year.data, form.buy_in_month.data):
+            from datetime import datetime as _dt
+            mo_name = _dt(2000, form.buy_in_month.data, 1).strftime("%B")
+            flash(
+                f"Cannot post a contribution with a buy-in of {mo_name} {form.buy_in_year.data} "
+                f"— that month is already closed. Choose an open month or reopen it first.",
+                "danger"
+            )
+            return render_template("funds/contribution_form.html", form=form, fund=fund,
+                                   current_year=current_year, donors=donors)
+
         donor = Donor.query.get(form.donor_id.data)
         contrib = FundContribution(
             fund_id=fund_id,
@@ -328,6 +348,19 @@ def new_contribution_standalone():
                                    current_year=current_year, donors=donors, funds=funds_list)
 
         fund = Fund.query.get(form.fund_id.data)
+
+        # Block contributions to a closed buy-in month
+        if _month_is_closed(fund.pool_id, form.buy_in_year.data, form.buy_in_month.data):
+            from datetime import datetime as _dt
+            mo_name = _dt(2000, form.buy_in_month.data, 1).strftime("%B")
+            flash(
+                f"Cannot post a contribution with a buy-in of {mo_name} {form.buy_in_year.data} "
+                f"— that month is already closed. Choose an open month or reopen it first.",
+                "danger"
+            )
+            return render_template("funds/new_contribution_standalone.html", form=form,
+                                   current_year=current_year, donors=donors, funds=funds_list)
+
         donor = Donor.query.get(form.donor_id.data)
         contrib = FundContribution(
             fund_id=fund.id,

@@ -151,7 +151,18 @@ def enter_activity(pool_id, vehicle_id, year, month):
     vehicle = InvestmentVehicle.query.get_or_404(vehicle_id)
     existing = VehicleMonthlyActivity.query.filter_by(vehicle_id=vehicle_id, year=year, month=month).first()
 
+    # Auto-carry beginning balance from prior month's ending balance
+    prev_year, prev_month = (year, month - 1) if month > 1 else (year - 1, 12)
+    prior_activity = VehicleMonthlyActivity.query.filter_by(
+        vehicle_id=vehicle_id, year=prev_year, month=prev_month, is_voided=False).first()
+    prior_ending = prior_activity.ending_balance if prior_activity else None
+
     form = ActivityForm(obj=existing)
+
+    # On GET with no existing record, pre-fill beginning balance from prior month
+    if request.method == "GET" and not existing and prior_ending is not None:
+        form.beginning_balance.data = prior_ending
+
     if form.validate_on_submit():
         if existing and existing.is_approved and not current_user.can_approve:
             flash("This period is already approved. Only admins can modify approved entries.", "danger")
@@ -192,7 +203,9 @@ def enter_activity(pool_id, vehicle_id, year, month):
         return redirect(url_for("pools.activity_list", pool_id=pool_id, year=year, month=month))
 
     return render_template("pools/activity_form.html",
-        form=form, pool=pool, vehicle=vehicle, year=year, month=month, existing=existing)
+        form=form, pool=pool, vehicle=vehicle, year=year, month=month,
+        existing=existing, prior_ending=prior_ending,
+        prev_year=prev_year, prev_month=prev_month)
 
 
 @pools_bp.route("/<int:pool_id>/activity/<int:vehicle_id>/<int:year>/<int:month>/approve", methods=["POST"])

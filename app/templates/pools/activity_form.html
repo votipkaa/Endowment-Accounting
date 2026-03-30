@@ -37,6 +37,21 @@
             <span class="input-group-text">$</span>
             {{ form.beginning_balance(class="form-control", id="beg_bal", step="0.01") }}
           </div>
+          {% if not existing %}
+            {% set month_names_short = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+            {% if prior_ending is not none %}
+            <div class="form-text text-success">
+              <i class="bi bi-arrow-right me-1"></i>
+              Carried from {{ month_names_short[prev_month - 1] }} {{ prev_year }} ending balance
+              (${{ "{:,.2f}".format(prior_ending) }}). Adjust only if there is a discrepancy.
+            </div>
+            {% else %}
+            <div class="form-text">
+              <i class="bi bi-info-circle me-1"></i>
+              No prior month activity found — enter the opening balance manually.
+            </div>
+            {% endif %}
+          {% endif %}
         </div>
 
         <hr class="my-3">
