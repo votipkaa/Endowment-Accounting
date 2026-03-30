@@ -1,0 +1,2 @@
+FLASK_APP=wsgi:application
+FLASK_ENV=development

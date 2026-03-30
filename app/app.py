@@ -129,43 +129,45 @@ def create_app():
             500,
         )
 
-    # Create tables and seed admin on first run
+    # Run database migrations and seed admin on startup
     with app.app_context():
         try:
-            db.create_all()
-            _run_migrations()
+            _run_db_upgrade()
             _seed_admin()
         except Exception as exc:
-            print(f"[STARTUP ERROR] db.create_all() failed: {exc}")
+            print(f"[STARTUP ERROR] Database initialization failed: {exc}")
             traceback.print_exc()
 
     return app
 
 
-def _run_migrations():
-    """Run lightweight schema migrations for new columns."""
-    from sqlalchemy import text, inspect
-    inspector = inspect(db.engine)
+def _run_db_upgrade():
+    """Run Alembic migrations to update the database schema."""
+    try:
+        from flask_migrate import upgrade
+        import os
 
-    # Add gift_type column to fund_contributions if it doesn't exist
-    if "fund_contributions" in inspector.get_table_names():
-        cols = [c["name"] for c in inspector.get_columns("fund_contributions")]
-        if "gift_type" not in cols:
-            try:
-                # Create the enum type first
-                db.session.execute(text(
-                    "DO $$ BEGIN "
-                    "CREATE TYPE gifttype AS ENUM ('cash','check','wire','stock','real_estate','in_kind','pledge','bequest','other'); "
-                    "EXCEPTION WHEN duplicate_object THEN null; END $$;"
-                ))
-                db.session.execute(text(
-                    "ALTER TABLE fund_contributions ADD COLUMN gift_type gifttype DEFAULT 'check'"
-                ))
-                db.session.commit()
-                print("  [MIGRATION] Added gift_type column to fund_contributions")
-            except Exception as e:
-                db.session.rollback()
-                print(f"  [MIGRATION] gift_type migration skipped: {e}")
+        # Check if migrations directory exists
+        migrations_dir = os.path.join(os.path.dirname(__file__), '..', 'migrations')
+        if os.path.exists(migrations_dir):
+            print("[DB] Running Alembic migrations...")
+            upgrade()
+            print("[DB] Migrations completed successfully.")
+        else:
+            print("[DB] No migrations directory found. Using db.create_all() as fallback.")
+            db.create_all()
+            print("[DB] Tables created from models.")
+    except ImportError:
+        print("[DB] Flask-Migrate not installed. Using db.create_all() as fallback.")
+        db.create_all()
+    except Exception as e:
+        print(f"[DB] Migration failed: {e}. Attempting db.create_all() as fallback...")
+        try:
+            db.create_all()
+            print("[DB] Tables created from models (fallback).")
+        except Exception as fallback_error:
+            print(f"[DB ERROR] Both migration and fallback failed: {fallback_error}")
+            raise
 
 
 def _seed_admin():
