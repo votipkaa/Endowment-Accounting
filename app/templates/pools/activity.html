@@ -57,13 +57,26 @@
       — Approve all activity below, then close the month to calculate unit prices.
     {% endif %}
   </div>
-  {% if not snapshot.is_closed and current_user.can_approve %}
-  <form method="POST" action="{{ url_for('pools.close_month', pool_id=pool.id, year=year, month=month) }}"
-        onsubmit="return confirm('Close {{ month_names[month-1] }} {{ year }}? This will calculate unit prices and update all fund balances.')">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button class="btn btn-success btn-sm"><i class="bi bi-lock me-1"></i> Close Month & Calculate Unit Price</button>
-  </form>
-  {% endif %}
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('pools.manage_adjustments', pool_id=pool.id, year=year, month=month) }}"
+       class="btn btn-outline-info btn-sm"><i class="bi bi-sliders me-1"></i> View Adjustments</a>
+    {% if snapshot.is_closed and current_user.can_approve %}
+    <form method="POST" action="{{ url_for('pools.reopen_month', pool_id=pool.id, year=year, month=month) }}"
+          onsubmit="return confirm('Reopen {{ month_names[month-1] }} {{ year }}? Fund snapshots will be cleared and recalculated when you re-close.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-warning btn-sm"><i class="bi bi-unlock me-1"></i> Reopen Month</button>
+    </form>
+    {% endif %}
+    {% if not snapshot.is_closed and current_user.can_approve %}
+    <a href="{{ url_for('pools.manage_adjustments', pool_id=pool.id, year=year, month=month) }}"
+       class="btn btn-outline-info btn-sm"><i class="bi bi-sliders me-1"></i> Adjustments</a>
+    <form method="POST" action="{{ url_for('pools.close_month', pool_id=pool.id, year=year, month=month) }}"
+          onsubmit="return confirm('Close {{ month_names[month-1] }} {{ year }}? This will calculate unit prices and update all fund balances.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-success btn-sm"><i class="bi bi-lock me-1"></i> Close Month & Calculate Unit Price</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
 {% elif current_user.can_approve %}
 <div class="alert alert-info d-flex justify-content-between align-items-center mb-4">

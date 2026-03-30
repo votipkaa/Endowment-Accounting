@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Adjustments — {{ pool.name }}{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.index') }}">Pools</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.detail', pool_id=pool.id) }}">{{ pool.name }}</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.activity_list', pool_id=pool.id, year=year, month=month) }}">Activity {{ year }}-{{ "%02d"|format(month) }}</a></li>
+  <li class="breadcrumb-item active">Adjustments</li>
+</ol>
+{% endblock %}
+{% block content %}
+{% set month_names = ['January','February','March','April','May','June','July','August','September','October','November','December'] %}
+<div class="page-header">
+  <h2>Pool Adjustments — {{ month_names[month-1] }} {{ year }}</h2>
+  <p class="text-muted mb-0">{{ pool.name }}</p>
+</div>
+
+<!-- Explanation -->
+<div class="alert alert-info mb-4">
+  <i class="bi bi-info-circle me-2"></i>
+  <strong>When to use adjustments:</strong> Use these to correct timing variances (e.g., interest earned on gift money before buy-in),
+  rounding differences, or prior period corrections. Adjustments modify the pool's total value before unit prices are calculated
+  when the month is closed. <strong>Positive amounts increase</strong> the pool value; <strong>negative amounts decrease</strong> it.
+</div>
+
+{% if snap.is_closed %}
+<div class="alert alert-warning mb-4">
+  <i class="bi bi-lock me-2"></i>
+  This month is <strong>closed</strong>. To add or modify adjustments, you must
+  <form method="POST" action="{{ url_for('pools.reopen_month', pool_id=pool.id, year=year, month=month) }}" class="d-inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-sm btn-warning"
+            onclick="return confirm('Reopen {{ month_names[month-1] }} {{ year }}? Fund snapshots will be cleared and recalculated when you re-close.')">
+      <i class="bi bi-unlock me-1"></i> Reopen This Month
+    </button>
+  </form>
+  first.
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <!-- Existing Adjustments -->
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6>Adjustment Entries</h6>
+        <span class="badge {% if adj_total >= 0 %}bg-success{% else %}bg-danger{% endif %} fs-6">
+          Net: ${{ "{:,.2f}".format(adj_total) }}
+        </span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Type</th>
+              <th>Description</th>
+              <th class="text-end">Amount</th>
+              <th>By</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for adj in adjustments %}
+            <tr>
+              <td>
+                <span class="badge bg-light text-dark">{{ adj.adjustment_type.replace('_', ' ').title() }}</span>
+              </td>
+              <td>{{ adj.description }}</td>
+              <td class="text-end text-money {% if adj.amount < 0 %}text-danger{% else %}text-success{% endif %}">
+                ${{ "{:,.2f}".format(adj.amount) }}
+              </td>
+              <td class="small text-muted">
+                {% if adj.created_by %}{{ adj.created_by.username }}{% endif %}
+              </td>
+              <td class="text-end">
+                {% if not snap.is_closed %}
+                <form method="POST" action="{{ url_for('pools.delete_adjustment', pool_id=pool.id, year=year, month=month, adj_id=adj.id) }}"
+                      onsubmit="return confirm('Delete this adjustment?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" class="text-center text-muted py-4">
+                No adjustments for this period.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add New Adjustment -->
+  <div class="col-md-5">
+    {% if not snap.is_closed %}
+    <div class="section-card">
+      <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-plus-circle me-2"></i>Add Adjustment</h6>
+      <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+          {{ form.adjustment_type.label(class="form-label") }}
+          {{ form.adjustment_type(class="form-select") }}
+        </div>
+        <div class="mb-3">
+          {{ form.amount.label(class="form-label") }}
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            {{ form.amount(class="form-control", step="0.01", placeholder="Positive to increase, negative to decrease") }}
+          </div>
+          <div class="form-text">
+            Use a <strong>positive</strong> number to increase the pool value (e.g., interest earned on gift money).
+            Use a <strong>negative</strong> number to decrease it.
+          </div>
+          {% for e in form.amount.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="mb-3">
+          {{ form.description.label(class="form-label") }}
+          {{ form.description(class="form-control", placeholder="e.g., Interest earned on March gifts before buy-in") }}
+          {% for e in form.description.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-plus-circle me-1"></i> Add Adjustment
+        </button>
+      </form>
+    </div>
+    {% else %}
+    <div class="section-card text-center text-muted py-4">
+      <i class="bi bi-lock fs-3 d-block mb-2"></i>
+      Reopen the month to add adjustments.
+    </div>
+    {% endif %}
+
+    <!-- Quick Guide -->
+    <div class="section-card mt-3">
+      <h6 class="fw-bold mb-2" style="color:#1e3a5f"><i class="bi bi-lightbulb me-2"></i>Common Adjustments</h6>
+      <div class="small">
+        <p class="mb-2"><strong>Timing Variance (+$20):</strong> Two gifts arrived March 15 and earned $20 interest before the month-end buy-in. Add +$20 so the unit price reflects the full pool value.</p>
+        <p class="mb-2"><strong>Rounding (-$0.03):</strong> Rounding causes a $0.03 discrepancy between vehicle totals and fund totals. Adjust to zero out the variance.</p>
+        <p class="mb-0"><strong>Prior Period Correction:</strong> Discovered a transaction was misclassified last month. Rather than reopening the old month, add a correction here.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex gap-2 mt-4">
+  <a href="{{ url_for('pools.activity_list', pool_id=pool.id, year=year, month=month) }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i> Back to Activity
+  </a>
+  {% if not snap.is_closed and current_user.can_approve %}
+  <form method="POST" action="{{ url_for('pools.close_month', pool_id=pool.id, year=year, month=month) }}"
+        onsubmit="return confirm('Close {{ month_names[month-1] }} {{ year }}? This will calculate unit prices including the adjustments above.')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-success"><i class="bi bi-lock me-1"></i> Close Month & Allocate Earnings</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

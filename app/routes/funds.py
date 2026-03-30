@@ -272,6 +272,106 @@ def void_contribution(fund_id, contrib_id):
     return redirect(url_for("funds.detail", fund_id=fund_id))
 
 
+# ── Standalone New Contribution (from sidebar) ──
+
+class StandaloneContributionForm(FlaskForm):
+    fund_id             = SelectField("Fund", coerce=int, validators=[DataRequired()])
+    donor_id            = SelectField("Donor", coerce=int, validators=[DataRequired()])
+    gift_type           = SelectField("Gift Type", validators=[DataRequired()],
+                            choices=[
+                                ("cash", "Cash"),
+                                ("check", "Check"),
+                                ("wire", "Wire Transfer"),
+                                ("stock", "Stock / Securities"),
+                                ("real_estate", "Real Estate"),
+                                ("in_kind", "In-Kind"),
+                                ("pledge", "Pledge"),
+                                ("bequest", "Bequest"),
+                                ("other", "Other"),
+                            ])
+    amount              = DecimalField("Amount ($)", places=2, validators=[DataRequired(), NumberRange(min=0.01)])
+    contribution_date   = DateField("Contribution Date", validators=[DataRequired()], default=date.today)
+    buy_in_year         = SelectField("Buy-In Year", coerce=int, validators=[DataRequired()])
+    buy_in_month        = SelectField("Buy-In Month", coerce=int, validators=[DataRequired()],
+                            choices=[(i, datetime(2000, i, 1).strftime("%B")) for i in range(1, 13)])
+    notes               = TextAreaField("Notes", validators=[Optional()])
+    document            = FileField("Attach Document", validators=[
+                            FileAllowed(["pdf", "doc", "docx", "xls", "xlsx", "jpg", "jpeg", "png", "gif", "tif", "tiff"],
+                                        "Allowed: PDF, Word, Excel, Images")])
+
+
+@funds_bp.route("/contributions/new", methods=["GET", "POST"])
+@login_required
+def new_contribution_standalone():
+    """Create a new contribution — standalone page accessible from sidebar."""
+    if not current_user.can_edit:
+        abort(403)
+    form = StandaloneContributionForm()
+    current_year = datetime.utcnow().year
+
+    funds_list = Fund.query.filter_by(is_active=True).order_by(Fund.name).all()
+    donors = Donor.query.filter_by(is_active=True).order_by(Donor.display_name).all()
+    form.fund_id.choices = [(0, "— Select a Fund —")] + [(f.id, f"{f.name} ({f.pool.name})") for f in funds_list]
+    form.donor_id.choices = [(0, "— Select a Donor —")] + [(d.id, d.display_name) for d in donors]
+    form.buy_in_year.choices = [(y, str(y)) for y in range(current_year - 5, current_year + 2)]
+    if request.method == "GET":
+        form.buy_in_year.data = current_year
+
+    if form.validate_on_submit():
+        if form.fund_id.data == 0:
+            flash("Please select a fund.", "warning")
+            return render_template("funds/new_contribution_standalone.html", form=form,
+                                   current_year=current_year, donors=donors, funds=funds_list)
+        if form.donor_id.data == 0:
+            flash("Please select a donor.", "warning")
+            return render_template("funds/new_contribution_standalone.html", form=form,
+                                   current_year=current_year, donors=donors, funds=funds_list)
+
+        fund = Fund.query.get(form.fund_id.data)
+        donor = Donor.query.get(form.donor_id.data)
+        contrib = FundContribution(
+            fund_id=fund.id,
+            donor_id=donor.id,
+            donor_name=donor.display_name,
+            gift_type=GiftType(form.gift_type.data),
+            amount=form.amount.data,
+            contribution_date=form.contribution_date.data,
+            buy_in_year=form.buy_in_year.data,
+            buy_in_month=form.buy_in_month.data,
+            notes=form.notes.data,
+            created_by_id=current_user.id,
+        )
+        db.session.add(contrib)
+        db.session.flush()
+
+        if form.document.data:
+            f = form.document.data
+            doc = Document(
+                entity_type="contribution",
+                entity_id=contrib.id,
+                filename=f.filename,
+                description=f"Gift document for {donor.display_name} — ${float(form.amount.data):,.2f}",
+                mime_type=f.content_type,
+                file_data=f.read(),
+                file_size=f.content_length or 0,
+                uploaded_by_id=current_user.id,
+            )
+            if not doc.file_size:
+                doc.file_size = len(doc.file_data)
+            db.session.add(doc)
+
+        db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.CREATE,
+            entity_type="FundContribution", entity_id=contrib.id,
+            description=f"Added {form.gift_type.data} contribution of ${form.amount.data:,.2f} from '{donor.display_name}' to fund '{fund.name}'",
+            ip_address=request.remote_addr))
+        db.session.commit()
+        flash(f"Contribution of ${float(form.amount.data):,.2f} from {donor.display_name} to {fund.name} added.", "success")
+        return redirect(url_for("funds.all_contributions"))
+
+    return render_template("funds/new_contribution_standalone.html", form=form,
+                           current_year=current_year, donors=donors, funds=funds_list)
+
+
 # ── All Contributions (global view) ──────────
 
 @funds_bp.route("/contributions")

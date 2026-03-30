@@ -247,9 +247,29 @@ class PoolMonthlySnapshot(db.Model):
     updated_at      = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     fund_snapshots  = db.relationship("FundMonthlySnapshot", backref="pool_snapshot", lazy="dynamic")
+    adjustments     = db.relationship("PoolAdjustment", backref="pool_snapshot", lazy="dynamic")
 
     def __repr__(self):
         return f"<PoolSnapshot {self.pool_id} {self.year}-{self.month:02d} ${self.unit_price}>"
+
+
+class PoolAdjustment(db.Model):
+    """Manual adjustment entries to correct timing variances and reconciliation differences."""
+    __tablename__ = "pool_adjustments"
+
+    id              = db.Column(db.Integer, primary_key=True)
+    pool_snapshot_id = db.Column(db.Integer, db.ForeignKey("pool_monthly_snapshots.id"), nullable=False)
+    description     = db.Column(db.String(300), nullable=False)
+    amount          = db.Column(db.Numeric(18, 4), nullable=False)  # Positive = increase pool value, negative = decrease
+    adjustment_type = db.Column(db.String(50), default="timing")  # timing, rounding, correction, other
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by_id   = db.Column(db.Integer, db.ForeignKey("users.id"))
+
+    created_by      = db.relationship("User", foreign_keys=[created_by_id])
+
+    def __repr__(self):
+        return f"<PoolAdjustment ${self.amount} '{self.description}'>"
+
 
 # ─────────────────────────────────────────────
 # Funds

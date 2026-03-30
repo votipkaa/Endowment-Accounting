@@ -17,7 +17,7 @@ import traceback
 from models import (
     db, User, UserRole, FundRestriction, DonorType, GiftType, AuditAction,
     InvestmentPool, InvestmentVehicle, VehicleMonthlyActivity, PoolMonthlySnapshot,
-    Fund, FundContribution, FundMonthlySnapshot,
+    PoolAdjustment, Fund, FundContribution, FundMonthlySnapshot,
     Distribution, Donor, AuditLog
 )
 

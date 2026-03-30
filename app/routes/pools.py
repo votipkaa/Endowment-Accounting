@@ -8,7 +8,7 @@ from datetime import datetime
 
 from models import (
     db, InvestmentPool, InvestmentVehicle, VehicleMonthlyActivity,
-    PoolMonthlySnapshot, FundMonthlySnapshot, Fund, FundContribution,
+    PoolMonthlySnapshot, PoolAdjustment, FundMonthlySnapshot, Fund, FundContribution,
     Distribution, AuditLog, AuditAction, Document
 )
 
@@ -236,6 +236,14 @@ def close_month(pool_id, year, month):
         db.session.add(snap)
 
     snap.total_value = total_value
+    db.session.flush()  # Ensure snap has an ID for adjustment lookup
+
+    # Include any manual adjustments (timing variances, corrections)
+    adjustment_total = Decimal("0")
+    adjustments = PoolAdjustment.query.filter_by(pool_snapshot_id=snap.id).all()
+    if adjustments:
+        adjustment_total = sum(Decimal(str(a.amount)) for a in adjustments)
+        snap.total_value = total_value + adjustment_total
 
     # Calculate total units: existing units from last month + new buy-ins this month
     # Get previous month snapshot for existing units
@@ -286,7 +294,8 @@ def close_month(pool_id, year, month):
         description=f"Closed month {year}-{month:02d} for pool '{pool.name}'. Unit price: ${unit_price:.4f}",
         ip_address=request.remote_addr))
     db.session.commit()
-    flash(f"Month closed. Unit price: ${float(unit_price):.4f}. Total pool value: ${float(total_value):,.2f}", "success")
+    adj_msg = f" (includes ${float(adjustment_total):,.2f} in adjustments)" if adjustment_total else ""
+    flash(f"Month closed. Unit price: ${float(unit_price):.4f}. Total pool value: ${float(snap.total_value):,.2f}{adj_msg}", "success")
     return redirect(url_for("pools.activity_list", pool_id=pool_id, year=year, month=month))
 
 
@@ -401,3 +410,135 @@ def vehicle_detail(pool_id, vehicle_id):
         chart_ending=chart_ending,
         chart_unrealized_cum=chart_unrealized_cum,
     )
+
+
+# ── Reopen Month ──────────────────────────────
+
+@pools_bp.route("/<int:pool_id>/reopen-month/<int:year>/<int:month>", methods=["POST"])
+@login_required
+def reopen_month(pool_id, year, month):
+    """Reopen a previously closed month so activity can be corrected and re-closed."""
+    if not current_user.can_approve:
+        abort(403)
+    pool = InvestmentPool.query.get_or_404(pool_id)
+    snap = PoolMonthlySnapshot.query.filter_by(pool_id=pool_id, year=year, month=month).first()
+    if not snap or not snap.is_closed:
+        flash("This month is not closed.", "warning")
+        return redirect(url_for("pools.activity_list", pool_id=pool_id, year=year, month=month))
+
+    # Check if a LATER month is closed — can only reopen the most recent closed month
+    next_year, next_month = (year, month + 1) if month < 12 else (year + 1, 1)
+    later_snap = PoolMonthlySnapshot.query.filter_by(pool_id=pool_id, year=next_year, month=next_month).first()
+    if later_snap and later_snap.is_closed:
+        flash("Cannot reopen this month because a later month is already closed. "
+              "Reopen the most recent month first, then work backwards.", "danger")
+        return redirect(url_for("pools.activity_list", pool_id=pool_id, year=year, month=month))
+
+    # Reopen: set is_closed = False, clear fund snapshots so they get recalculated
+    snap.is_closed = False
+
+    # Reset contribution unit purchases for this period (they'll be recalculated on re-close)
+    contributions = (FundContribution.query
+        .join(Fund)
+        .filter(Fund.pool_id == pool_id,
+                FundContribution.buy_in_year == year,
+                FundContribution.buy_in_month == month,
+                FundContribution.is_voided == False)
+        .all())
+    for c in contributions:
+        c.units_purchased = None
+        c.unit_price_paid = None
+
+    # Delete fund snapshots for this month (they'll be recreated on re-close)
+    FundMonthlySnapshot.query.filter_by(pool_snapshot_id=snap.id).delete()
+
+    db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.UPDATE,
+        entity_type="PoolMonthlySnapshot", entity_id=snap.id,
+        description=f"Reopened month {year}-{month:02d} for pool '{pool.name}'",
+        ip_address=request.remote_addr))
+    db.session.commit()
+    flash(f"Month {year}-{month:02d} reopened. Edit activity or add adjustments, then close again.", "success")
+    return redirect(url_for("pools.activity_list", pool_id=pool_id, year=year, month=month))
+
+
+# ── Pool Adjustments ──────────────────────────
+
+class AdjustmentForm(FlaskForm):
+    amount          = DecimalField("Adjustment Amount ($)", places=2, validators=[DataRequired()])
+    adjustment_type = SelectField("Type", validators=[DataRequired()],
+                        choices=[
+                            ("timing", "Timing Variance"),
+                            ("rounding", "Rounding Difference"),
+                            ("correction", "Prior Period Correction"),
+                            ("other", "Other"),
+                        ])
+    description     = StringField("Description", validators=[DataRequired()])
+
+
+@pools_bp.route("/<int:pool_id>/adjustments/<int:year>/<int:month>", methods=["GET", "POST"])
+@login_required
+def manage_adjustments(pool_id, year, month):
+    """View and add adjustment entries for a pool month."""
+    if not current_user.can_approve:
+        abort(403)
+    pool = InvestmentPool.query.get_or_404(pool_id)
+
+    # Get or create snapshot (adjustments attach to the snapshot)
+    snap = PoolMonthlySnapshot.query.filter_by(pool_id=pool_id, year=year, month=month).first()
+    if not snap:
+        snap = PoolMonthlySnapshot(pool_id=pool_id, year=year, month=month)
+        db.session.add(snap)
+        db.session.flush()
+
+    form = AdjustmentForm()
+    if form.validate_on_submit():
+        if snap.is_closed:
+            flash("Month is closed. Reopen it first before adding adjustments.", "danger")
+            return redirect(url_for("pools.manage_adjustments", pool_id=pool_id, year=year, month=month))
+
+        adj = PoolAdjustment(
+            pool_snapshot_id=snap.id,
+            amount=form.amount.data,
+            adjustment_type=form.adjustment_type.data,
+            description=form.description.data,
+            created_by_id=current_user.id,
+        )
+        db.session.add(adj)
+        db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.CREATE,
+            entity_type="PoolAdjustment", entity_id=snap.id,
+            description=f"Added {form.adjustment_type.data} adjustment of ${float(form.amount.data):,.2f} for {pool.name} {year}-{month:02d}: {form.description.data}",
+            ip_address=request.remote_addr))
+        db.session.commit()
+        flash(f"Adjustment of ${float(form.amount.data):,.2f} added.", "success")
+        return redirect(url_for("pools.manage_adjustments", pool_id=pool_id, year=year, month=month))
+
+    adjustments = PoolAdjustment.query.filter_by(pool_snapshot_id=snap.id).order_by(PoolAdjustment.created_at.desc()).all()
+    adj_total = sum(Decimal(str(a.amount)) for a in adjustments)
+
+    return render_template("pools/adjustments.html",
+        pool=pool, snap=snap, form=form,
+        adjustments=adjustments, adj_total=adj_total,
+        year=year, month=month)
+
+
+@pools_bp.route("/<int:pool_id>/adjustments/<int:year>/<int:month>/<int:adj_id>/delete", methods=["POST"])
+@login_required
+def delete_adjustment(pool_id, year, month, adj_id):
+    """Remove an adjustment entry."""
+    if not current_user.can_approve:
+        abort(403)
+    adj = PoolAdjustment.query.get_or_404(adj_id)
+    snap = adj.pool_snapshot
+    if snap.is_closed:
+        flash("Month is closed. Reopen it first.", "danger")
+        return redirect(url_for("pools.manage_adjustments", pool_id=pool_id, year=year, month=month))
+
+    desc = adj.description
+    db.session.delete(adj)
+    db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.VOID,
+        entity_type="PoolAdjustment", entity_id=adj_id,
+        description=f"Deleted adjustment '{desc}' for pool {pool_id} {year}-{month:02d}",
+        ip_address=request.remote_addr))
+    db.session.commit()
+    flash("Adjustment removed.", "success")
+    return redirect(url_for("pools.manage_adjustments", pool_id=pool_id, year=year, month=month))
