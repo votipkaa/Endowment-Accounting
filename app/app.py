@@ -6,9 +6,10 @@ from flask import Flask, render_template, redirect, url_for, request, flash, jso
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
+from flask_migrate import Migrate
 from wtforms import StringField, PasswordField, SelectField, DecimalField, DateField, TextAreaField, BooleanField, IntegerField
 from wtforms.validators import DataRequired, Email, Optional, NumberRange
-from sqlalchemy import func
+from sqlalchemy import func, inspect
 from decimal import Decimal
 from datetime import datetime, date
 import os
@@ -20,6 +21,8 @@ from models import (
     PoolAdjustment, Fund, FundContribution, FundMonthlySnapshot,
     Distribution, Donor, AuditLog
 )
+
+migrate = Migrate()
 
 # ─────────────────────────────────────────────
 # App Factory
@@ -39,6 +42,7 @@ def create_app():
     app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload limit
 
     db.init_app(app)
+    migrate.init_app(app, db)
     CSRFProtect(app)
 
     login_manager = LoginManager(app)
@@ -58,6 +62,7 @@ def create_app():
     from routes.admin import admin_bp
     from routes.documents import documents_bp
     from routes.donors import donors_bp
+    from routes.import_data import import_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(pools_bp, url_prefix="/pools")
@@ -67,6 +72,7 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(documents_bp, url_prefix="/documents")
     app.register_blueprint(donors_bp, url_prefix="/donors")
+    app.register_blueprint(import_bp, url_prefix="/import")
 
     # Dashboard route
     @app.route("/")
@@ -142,32 +148,58 @@ def create_app():
 
 
 def _run_db_upgrade():
-    """Run Alembic migrations to update the database schema."""
-    try:
-        from flask_migrate import upgrade
-        import os
+    """Ensure the database schema exists and is up-to-date.
 
-        # Check if migrations directory exists
+    Strategy:
+    1. Always call db.create_all() first — this is idempotent and will NOT
+       drop existing tables or data.  It only creates tables that are missing.
+    2. Then attempt to run Alembic migrations for any incremental schema
+       changes (new columns, etc.).  If the database has never been stamped
+       by Alembic we stamp it to 'head' so future migrations apply cleanly.
+    """
+    # Step 1 — guarantee every table defined in models.py exists
+    print("[DB] Ensuring all tables exist (db.create_all) …")
+    db.create_all()
+    print("[DB] Tables verified.")
+
+    # Step 2 — run Alembic migrations (if any)
+    try:
+        from flask_migrate import upgrade, stamp
+
         migrations_dir = os.path.join(os.path.dirname(__file__), '..', 'migrations')
-        if os.path.exists(migrations_dir):
-            print("[DB] Running Alembic migrations...")
-            upgrade()
-            print("[DB] Migrations completed successfully.")
+        versions_dir = os.path.join(migrations_dir, 'versions')
+
+        if not os.path.exists(versions_dir):
+            print("[DB] No migrations/versions directory — skipping Alembic.")
+            return
+
+        # Are there actual migration scripts?
+        version_files = [f for f in os.listdir(versions_dir)
+                         if f.endswith('.py') and f != '__init__.py']
+        if not version_files:
+            print("[DB] No migration scripts found — skipping Alembic.")
+            return
+
+        # Check whether Alembic has been initialised on this database
+        inspector = inspect(db.engine)
+        has_alembic_table = 'alembic_version' in inspector.get_table_names()
+
+        if not has_alembic_table:
+            # Database was created by db.create_all(), never managed by Alembic.
+            # Stamp it at 'head' so future migrations apply from this point.
+            print("[DB] First Alembic run — stamping database at head …")
+            stamp(revision='head')
+            print("[DB] Database stamped.")
         else:
-            print("[DB] No migrations directory found. Using db.create_all() as fallback.")
-            db.create_all()
-            print("[DB] Tables created from models.")
+            # Normal path — apply any pending migrations
+            print("[DB] Running pending Alembic migrations …")
+            upgrade()
+            print("[DB] Migrations applied.")
+
     except ImportError:
-        print("[DB] Flask-Migrate not installed. Using db.create_all() as fallback.")
-        db.create_all()
+        print("[DB] Flask-Migrate not installed — relying on db.create_all() only.")
     except Exception as e:
-        print(f"[DB] Migration failed: {e}. Attempting db.create_all() as fallback...")
-        try:
-            db.create_all()
-            print("[DB] Tables created from models (fallback).")
-        except Exception as fallback_error:
-            print(f"[DB ERROR] Both migration and fallback failed: {fallback_error}")
-            raise
+        print(f"[DB] Alembic step skipped ({e}). Tables already ensured by create_all().")
 
 
 def _seed_admin():

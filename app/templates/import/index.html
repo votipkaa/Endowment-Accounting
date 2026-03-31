@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Data Import{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item active">Data Import</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Data Import</h2>
+  <p class="text-muted mb-0">Batch import donors and historical gifts from CSV files to onboard an existing foundation.</p>
+</div>
+
+<div class="row g-4 justify-content-center">
+  <!-- Donor Import -->
+  <div class="col-md-5">
+    <div class="section-card h-100">
+      <div class="text-center mb-3">
+        <i class="bi bi-people-fill" style="font-size:2.5rem; color:#2a5298"></i>
+      </div>
+      <h5 class="fw-bold text-center mb-3">Import Donors</h5>
+      <p class="text-muted">
+        Upload a CSV file with donor information — names, addresses, contact details, and donor types.
+        Duplicates (matching display name) are automatically skipped.
+      </p>
+      <div class="mb-3">
+        <strong class="small text-uppercase text-muted">Required columns:</strong>
+        <div class="small mt-1"><code>display_name</code> (or <code>first_name</code> + <code>last_name</code>)</div>
+      </div>
+      <div class="mb-3">
+        <strong class="small text-uppercase text-muted">Optional columns:</strong>
+        <div class="small mt-1">
+          <code>donor_type</code>, <code>organization</code>, <code>email</code>, <code>phone</code>,
+          <code>address_line1</code>, <code>city</code>, <code>state</code>, <code>zip_code</code>,
+          <code>country</code>, <code>notes</code>
+        </div>
+      </div>
+      <div class="d-flex gap-2 mt-auto">
+        <a href="{{ url_for('import_data.import_donors') }}" class="btn btn-primary flex-fill">
+          <i class="bi bi-upload me-1"></i> Import Donors
+        </a>
+        <a href="{{ url_for('import_data.donor_template') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-download me-1"></i> Template
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gift Import -->
+  <div class="col-md-5">
+    <div class="section-card h-100">
+      <div class="text-center mb-3">
+        <i class="bi bi-gift-fill" style="font-size:2.5rem; color:#2a5298"></i>
+      </div>
+      <h5 class="fw-bold text-center mb-3">Import Gifts / Contributions</h5>
+      <p class="text-muted">
+        Upload a CSV file with historical gift records. Donors not already in the system will be
+        auto-created. You can specify which fund each gift belongs to in the CSV, or select a default
+        fund for all rows.
+      </p>
+      <div class="mb-3">
+        <strong class="small text-uppercase text-muted">Required columns:</strong>
+        <div class="small mt-1"><code>amount</code>, <code>contribution_date</code> (or <code>date</code>)</div>
+      </div>
+      <div class="mb-3">
+        <strong class="small text-uppercase text-muted">Optional columns:</strong>
+        <div class="small mt-1">
+          <code>donor_name</code>, <code>fund_name</code>, <code>gift_type</code>, <code>notes</code>
+        </div>
+      </div>
+      <div class="d-flex gap-2 mt-auto">
+        <a href="{{ url_for('import_data.import_gifts') }}" class="btn btn-primary flex-fill">
+          <i class="bi bi-upload me-1"></i> Import Gifts
+        </a>
+        <a href="{{ url_for('import_data.gift_template') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-download me-1"></i> Template
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Onboarding Guide -->
+<div class="row justify-content-center mt-4">
+  <div class="col-md-10">
+    <div class="section-card" style="background:#f8fafc; border-left:4px solid #2a5298">
+      <h6 class="fw-bold mb-2"><i class="bi bi-lightbulb me-1"></i> Onboarding a New Foundation</h6>
+      <p class="text-muted small mb-2">There are two ways to establish a starting point for each fund:</p>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="fw-semibold small mb-1">Option A: Detailed Import</div>
+          <ol class="small text-muted mb-0" style="padding-left:1.2rem">
+            <li>Import donors via CSV</li>
+            <li>Import all historical gifts via CSV</li>
+            <li>Set the beginning earnings on each fund to match the investment account</li>
+          </ol>
+        </div>
+        <div class="col-md-6">
+          <div class="fw-semibold small mb-1">Option B: Summary Starting Point</div>
+          <ol class="small text-muted mb-0" style="padding-left:1.2rem">
+            <li>Create each fund manually</li>
+            <li>Enter the <strong>Beginning Corpus</strong> and <strong>Beginning Earnings</strong> on the fund setup form</li>
+            <li>This sets the starting value that ties to the investment statements</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

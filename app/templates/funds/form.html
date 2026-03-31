@@ -78,6 +78,43 @@
         </div>
       </div>
 
+      <!-- Beginning Balance (Onboarding) -->
+      <div class="section-card mb-3">
+        <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-box-arrow-in-right me-2"></i>Beginning Balance (Onboarding)</h6>
+        <p class="text-muted small mb-3">
+          Use these fields when migrating an existing foundation into the system. Enter the corpus and
+          accumulated earnings as of the date this software becomes the system of record.
+          Leave at $0 if you will enter all historical gifts individually or via CSV import.
+        </p>
+        <div class="row g-3">
+          <div class="col-6">
+            {{ form.beginning_corpus.label(class="form-label") }}
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              {{ form.beginning_corpus(class="form-control", step="0.01", placeholder="0.00") }}
+            </div>
+            <small class="text-muted">Total original gift principal as of onboarding date</small>
+            {% for e in form.beginning_corpus.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-6">
+            {{ form.beginning_earnings.label(class="form-label") }}
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              {{ form.beginning_earnings(class="form-control", step="0.01", placeholder="0.00") }}
+            </div>
+            <small class="text-muted">Accumulated earnings (or losses) as of onboarding date</small>
+            {% for e in form.beginning_earnings.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="col-12" id="beginningTotal" style="display:none">
+            <div class="alert alert-info mb-0 py-2">
+              <i class="bi bi-calculator me-1"></i>
+              Beginning fund value: <strong id="begValueCalc">$0.00</strong>
+              <small class="text-muted ms-2">(corpus + earnings)</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Notes -->
       <div class="section-card mb-4">
         <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-journal-text me-2"></i>Notes</h6>
@@ -105,5 +142,27 @@ function updatePurpose() {
 }
 sel.addEventListener('change', updatePurpose);
 updatePurpose();
+
+// Beginning balance calculator
+const begCorpus = document.getElementById('beginning_corpus');
+const begEarnings = document.getElementById('beginning_earnings');
+const begTotal = document.getElementById('beginningTotal');
+const begCalc = document.getElementById('begValueCalc');
+function updateBegBalance() {
+  const c = parseFloat(begCorpus.value) || 0;
+  const e = parseFloat(begEarnings.value) || 0;
+  if (c > 0 || e !== 0) {
+    begTotal.style.display = '';
+    const total = c + e;
+    begCalc.textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  } else {
+    begTotal.style.display = 'none';
+  }
+}
+if (begCorpus && begEarnings) {
+  begCorpus.addEventListener('input', updateBegBalance);
+  begEarnings.addEventListener('input', updateBegBalance);
+  updateBegBalance();
+}
 </script>
 {% endblock %}

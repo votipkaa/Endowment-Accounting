@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Import Donors{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('import_data.index') }}">Data Import</a></li>
+  <li class="breadcrumb-item active">Import Donors</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Import Donors from CSV</h2>
+  <p class="text-muted mb-0">Upload a CSV file to batch-create donor records.</p>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="section-card mb-3">
+      <form method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+          {{ form.csv_file.label(class="form-label fw-bold") }}
+          {{ form.csv_file(class="form-control", accept=".csv") }}
+          {% for e in form.csv_file.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-upload me-1"></i> Upload & Import
+          </button>
+          <a href="{{ url_for('import_data.donor_template') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-download me-1"></i> Download Template
+          </a>
+          <a href="{{ url_for('import_data.index') }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Column Reference -->
+    <div class="section-card" style="background:#f8fafc">
+      <h6 class="fw-bold mb-2"><i class="bi bi-table me-1"></i> CSV Column Reference</h6>
+      <table class="table table-sm small mb-0">
+        <thead>
+          <tr><th>Column Name</th><th>Required?</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>display_name</code></td><td><span class="badge bg-danger">Yes*</span></td><td>Full name as it appears on reports</td></tr>
+          <tr><td><code>first_name</code></td><td>No*</td><td>Individual first name</td></tr>
+          <tr><td><code>last_name</code></td><td>No*</td><td>Individual last name</td></tr>
+          <tr><td><code>organization</code></td><td>No</td><td>Organization name (for non-individual donors)</td></tr>
+          <tr><td><code>donor_type</code></td><td>No</td><td>individual, organization, foundation, trust, estate, other</td></tr>
+          <tr><td><code>email</code></td><td>No</td><td>Primary email</td></tr>
+          <tr><td><code>phone</code></td><td>No</td><td>Primary phone</td></tr>
+          <tr><td><code>address_line1</code></td><td>No</td><td>Street address</td></tr>
+          <tr><td><code>address_line2</code></td><td>No</td><td>Suite, apt, etc.</td></tr>
+          <tr><td><code>city</code></td><td>No</td><td>City</td></tr>
+          <tr><td><code>state</code></td><td>No</td><td>State / Province</td></tr>
+          <tr><td><code>zip_code</code></td><td>No</td><td>ZIP / postal code</td></tr>
+          <tr><td><code>country</code></td><td>No</td><td>Defaults to "United States"</td></tr>
+          <tr><td><code>notes</code></td><td>No</td><td>Notes about the donor</td></tr>
+        </tbody>
+      </table>
+      <p class="text-muted small mt-2 mb-0">* If <code>display_name</code> is blank, <code>first_name</code> + <code>last_name</code> will be used. At least one is required.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

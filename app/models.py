@@ -291,6 +291,13 @@ class Fund(db.Model):
     created_at              = db.Column(db.DateTime, default=datetime.utcnow)
     created_by_id           = db.Column(db.Integer, db.ForeignKey("users.id"))
 
+    # ── Onboarding / beginning balance fields ──
+    # Used when migrating an existing foundation into the system.
+    # beginning_corpus = the total original gift principal as of the onboarding date
+    # beginning_earnings = accumulated earnings (or losses) as of the onboarding date
+    beginning_corpus        = db.Column(db.Numeric(18, 4), default=0)
+    beginning_earnings      = db.Column(db.Numeric(18, 4), default=0)
+
     contributions   = db.relationship("FundContribution", backref="fund", lazy="dynamic", cascade="all, delete-orphan")
     snapshots       = db.relationship("FundMonthlySnapshot", backref="fund", lazy="dynamic", cascade="all, delete-orphan")
     distributions   = db.relationship("Distribution", backref="fund", lazy="dynamic")
@@ -299,9 +306,9 @@ class Fund(db.Model):
 
     @property
     def total_corpus(self):
-        """Sum of all contributions (original principal)."""
+        """Sum of beginning corpus + all contributions (original principal)."""
         result = db.session.query(db.func.sum(FundContribution.amount)).filter_by(fund_id=self.id, is_voided=False).scalar()
-        return float(result or 0)
+        return float(self.beginning_corpus or 0) + float(result or 0)
 
     @property
     def latest_snapshot(self):
@@ -313,7 +320,10 @@ class Fund(db.Model):
     @property
     def current_value(self):
         snap = self.latest_snapshot
-        return float(snap.fund_value) if snap else self.total_corpus
+        if snap:
+            return float(snap.fund_value)
+        # No snapshots yet — value = corpus + beginning earnings
+        return self.total_corpus + float(self.beginning_earnings or 0)
 
     @property
     def current_units(self):

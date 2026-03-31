@@ -41,6 +41,11 @@ class FundForm(FlaskForm):
                                 validators=[DataRequired(), NumberRange(0, 100)], default=5.0)
     allow_underwater_spend  = BooleanField("Allow distributions when fund is underwater")
     inception_date          = DateField("Inception Date", validators=[DataRequired()], default=date.today)
+    # Onboarding / beginning balance fields
+    beginning_corpus        = DecimalField("Beginning Corpus ($)", places=2,
+                                validators=[Optional(), NumberRange(min=0)], default=0)
+    beginning_earnings      = DecimalField("Beginning Earnings ($)", places=2,
+                                validators=[Optional()], default=0)
     notes                   = TextAreaField("Additional Notes", validators=[Optional()])
 
 
@@ -107,14 +112,19 @@ def new_fund():
             spend_rate=form.spend_rate.data / 100,  # Store as decimal
             allow_underwater_spend=form.allow_underwater_spend.data,
             inception_date=form.inception_date.data,
+            beginning_corpus=form.beginning_corpus.data or 0,
+            beginning_earnings=form.beginning_earnings.data or 0,
             notes=form.notes.data,
             created_by_id=current_user.id,
         )
         db.session.add(fund)
         db.session.flush()
+        beg_desc = ""
+        if float(form.beginning_corpus.data or 0) > 0:
+            beg_desc = f" (beginning corpus: ${float(form.beginning_corpus.data):,.2f}, earnings: ${float(form.beginning_earnings.data or 0):,.2f})"
         db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.CREATE,
             entity_type="Fund", entity_id=fund.id,
-            description=f"Created fund '{fund.name}'", ip_address=request.remote_addr))
+            description=f"Created fund '{fund.name}'{beg_desc}", ip_address=request.remote_addr))
         db.session.commit()
         flash(f"Fund '{fund.name}' created. Add an initial contribution to get started.", "success")
         return redirect(url_for("funds.detail", fund_id=fund.id))
@@ -175,6 +185,8 @@ def edit_fund(fund_id):
     if request.method == "GET":
         form.spend_rate.data = float(fund.spend_rate or 0) * 100
         form.restriction.data = fund.restriction.value
+        form.beginning_corpus.data = float(fund.beginning_corpus or 0)
+        form.beginning_earnings.data = float(fund.beginning_earnings or 0)
 
     if form.validate_on_submit():
         fund.name = form.name.data
@@ -185,6 +197,8 @@ def edit_fund(fund_id):
         fund.spend_rate = form.spend_rate.data / 100
         fund.allow_underwater_spend = form.allow_underwater_spend.data
         fund.inception_date = form.inception_date.data
+        fund.beginning_corpus = form.beginning_corpus.data or 0
+        fund.beginning_earnings = form.beginning_earnings.data or 0
         fund.notes = form.notes.data
         db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.UPDATE,
             entity_type="Fund", entity_id=fund.id,
