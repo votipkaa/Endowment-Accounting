@@ -534,6 +534,178 @@ def manage_adjustments(pool_id, year, month):
         year=year, month=month)
 
 
+# ── Pool Initialization (Onboarding) ─────────
+
+class InitializePoolForm(FlaskForm):
+    year  = SelectField("Cutoff Year", coerce=int, validators=[DataRequired()])
+    month = SelectField("Cutoff Month", coerce=int, validators=[DataRequired()],
+                choices=[(i, datetime(2000, i, 1).strftime("%B")) for i in range(1, 13)])
+    total_pool_value = DecimalField("Total Pool Value ($)", places=2,
+                         validators=[DataRequired(), NumberRange(min=0)],
+                         description="Total market value from investment statements as of this month-end")
+
+
+@pools_bp.route("/<int:pool_id>/initialize", methods=["GET", "POST"])
+@login_required
+def initialize_pool(pool_id):
+    """Create an opening snapshot that establishes Day 1 unit ownership for all funds.
+
+    This is the critical onboarding step: it tells the system what each fund was
+    worth as of a cutoff date and creates the unit structure that allows future
+    month-close processes to allocate earnings correctly.
+    """
+    if not current_user.can_approve:
+        abort(403)
+    pool = InvestmentPool.query.get_or_404(pool_id)
+    funds = Fund.query.filter_by(pool_id=pool_id, is_active=True).order_by(Fund.name).all()
+
+    # Check if pool already has a closed snapshot (i.e., already initialized)
+    existing_closed = PoolMonthlySnapshot.query.filter_by(
+        pool_id=pool_id, is_closed=True).first()
+
+    current_year = datetime.utcnow().year
+    form = InitializePoolForm()
+    form.year.choices = [(y, str(y)) for y in range(current_year - 10, current_year + 1)]
+    if request.method == "GET":
+        # Default to last month
+        now = datetime.utcnow()
+        if now.month == 1:
+            form.year.data = now.year - 1
+            form.month.data = 12
+        else:
+            form.year.data = now.year
+            form.month.data = now.month - 1
+
+    # Build a preview of fund values
+    fund_preview = []
+    for fund in funds:
+        corpus = float(fund.beginning_corpus or 0)
+        # Also add any contributions already in the system
+        from sqlalchemy import func as sqlfunc
+        contribs_total = db.session.query(sqlfunc.sum(FundContribution.amount))\
+            .filter_by(fund_id=fund.id, is_voided=False).scalar()
+        corpus += float(contribs_total or 0)
+        earnings = float(fund.beginning_earnings or 0)
+        total = corpus + earnings
+        fund_preview.append({
+            "fund": fund,
+            "corpus": corpus,
+            "earnings": earnings,
+            "total": total,
+        })
+    total_fund_value = sum(fp["total"] for fp in fund_preview)
+
+    if form.validate_on_submit():
+        init_year = form.year.data
+        init_month = form.month.data
+        pool_value = Decimal(str(form.total_pool_value.data))
+
+        if pool_value <= 0:
+            flash("Pool value must be greater than zero.", "danger")
+            return render_template("pools/initialize.html", form=form, pool=pool,
+                                   funds=funds, fund_preview=fund_preview,
+                                   total_fund_value=total_fund_value,
+                                   existing_closed=existing_closed)
+
+        # Check no snapshot already exists for this period
+        existing_snap = PoolMonthlySnapshot.query.filter_by(
+            pool_id=pool_id, year=init_year, month=init_month).first()
+        if existing_snap and existing_snap.is_closed:
+            flash(f"A closed snapshot already exists for {init_year}-{init_month:02d}. "
+                  "Reopen it first or choose a different period.", "danger")
+            return render_template("pools/initialize.html", form=form, pool=pool,
+                                   funds=funds, fund_preview=fund_preview,
+                                   total_fund_value=total_fund_value,
+                                   existing_closed=existing_closed)
+
+        # ── Create the opening snapshot ──
+        if not existing_snap:
+            snap = PoolMonthlySnapshot(pool_id=pool_id, year=init_year, month=init_month)
+            db.session.add(snap)
+        else:
+            snap = existing_snap
+
+        snap.total_value = pool_value
+        # Unit price = $1.00 at inception; total units = total pool value
+        unit_price = Decimal("1.000000")
+        snap.unit_price = unit_price
+        snap.total_units = pool_value  # $1 per unit means units = dollars
+        snap.is_closed = True
+        db.session.flush()
+
+        # ── Create fund snapshots & assign units ──
+        # Each fund gets units proportional to its value
+        total_fund_val = Decimal("0")
+        fund_values = []
+        for fund in funds:
+            corpus = Decimal(str(fund.beginning_corpus or 0))
+            from sqlalchemy import func as sqlfunc
+            contribs = db.session.query(sqlfunc.sum(FundContribution.amount))\
+                .filter_by(fund_id=fund.id, is_voided=False).scalar()
+            corpus += Decimal(str(contribs or 0))
+            earnings = Decimal(str(fund.beginning_earnings or 0))
+            fund_val = corpus + earnings
+            fund_values.append((fund, fund_val, corpus))
+            total_fund_val += fund_val
+
+        for fund, fund_val, corpus in fund_values:
+            if total_fund_val > 0 and pool_value > 0:
+                # Proportional allocation: fund_units = (fund_val / total_fund_val) * total_pool_units
+                fund_units = (fund_val / total_fund_val) * pool_value
+            else:
+                fund_units = Decimal("0")
+
+            fund_value_at_close = fund_units * unit_price  # = fund_units since price is $1
+
+            fsnap = FundMonthlySnapshot.query.filter_by(
+                fund_id=fund.id, year=init_year, month=init_month).first()
+            if not fsnap:
+                fsnap = FundMonthlySnapshot(fund_id=fund.id, year=init_year, month=init_month)
+                db.session.add(fsnap)
+            fsnap.pool_snapshot_id = snap.id
+            fsnap.units_held = fund_units
+            fsnap.unit_price = unit_price
+            fsnap.fund_value = fund_value_at_close
+            fsnap.corpus_balance = corpus
+
+        # ── Stamp all existing contributions as bought-in ──
+        all_contribs = FundContribution.query.join(Fund)\
+            .filter(Fund.pool_id == pool_id, FundContribution.is_voided == False).all()
+        for c in all_contribs:
+            if c.units_purchased is None:
+                c.units_purchased = Decimal(str(c.amount)) / unit_price
+                c.unit_price_paid = unit_price
+                c.buy_in_year = init_year
+                c.buy_in_month = init_month
+
+        db.session.add(AuditLog(
+            user_id=current_user.id, action=AuditAction.CREATE,
+            entity_type="PoolMonthlySnapshot", entity_id=snap.id,
+            description=(
+                f"Initialized pool '{pool.name}' as of {init_year}-{init_month:02d}. "
+                f"Pool value: ${float(pool_value):,.2f}, Unit price: $1.000000, "
+                f"Total units: {float(pool_value):,.4f}, Funds: {len(funds)}"
+            ),
+            ip_address=request.remote_addr,
+        ))
+        db.session.commit()
+
+        month_name = datetime(2000, init_month, 1).strftime("%B")
+        flash(
+            f"Pool initialized as of {month_name} {init_year}. "
+            f"Unit price: $1.00, total units: {float(pool_value):,.4f}. "
+            f"{len(funds)} fund(s) now own units. "
+            f"You can now enter activity for {('January ' + str(init_year + 1)) if init_month == 12 else (datetime(2000, init_month + 1, 1).strftime('%B') + ' ' + str(init_year))} and close months going forward.",
+            "success"
+        )
+        return redirect(url_for("pools.detail", pool_id=pool_id))
+
+    return render_template("pools/initialize.html", form=form, pool=pool,
+                           funds=funds, fund_preview=fund_preview,
+                           total_fund_value=total_fund_value,
+                           existing_closed=existing_closed)
+
+
 @pools_bp.route("/<int:pool_id>/adjustments/<int:year>/<int:month>/<int:adj_id>/delete", methods=["POST"])
 @login_required
 def delete_adjustment(pool_id, year, month, adj_id):

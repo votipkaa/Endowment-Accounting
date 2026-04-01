@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Initialize Pool — {{ pool.name }}{% endblock %}
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.index') }}">Pools</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('pools.detail', pool_id=pool.id) }}">{{ pool.name }}</a></li>
+  <li class="breadcrumb-item active">Initialize Pool</li>
+</ol>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Initialize Pool — {{ pool.name }}</h2>
+  <p class="text-muted mb-0">
+    Establish the starting point so the system knows how much each fund is worth and can allocate earnings going forward.
+  </p>
+</div>
+
+{% if existing_closed %}
+<div class="alert alert-warning mb-4">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  <strong>This pool already has a closed month.</strong>
+  Initialization is intended for first-time setup.  If you need to re-initialize, reopen the existing closed month first
+  from the <a href="{{ url_for('pools.activity_list', pool_id=pool.id) }}">Monthly Activity</a> page.
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <!-- Left: Form -->
+  <div class="col-lg-5">
+    <div class="section-card">
+      <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-calendar-check me-2"></i>Cutoff Date & Pool Value</h6>
+      <form method="POST">
+        {{ form.hidden_tag() }}
+
+        <p class="text-muted small">
+          Choose the last month <strong>before</strong> you start entering live activity.
+          For example, if you're starting in January 2026, choose December 2025.
+        </p>
+
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            {{ form.year.label(class="form-label") }}
+            {{ form.year(class="form-select") }}
+          </div>
+          <div class="col-6">
+            {{ form.month.label(class="form-label") }}
+            {{ form.month(class="form-select") }}
+          </div>
+        </div>
+
+        <div class="mb-3">
+          {{ form.total_pool_value.label(class="form-label") }}
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            {{ form.total_pool_value(class="form-control", step="0.01", placeholder="e.g. 5000000.00", id="poolValueInput") }}
+          </div>
+          <small class="text-muted">
+            This should match the total market value on your investment statements as of the cutoff month-end.
+          </small>
+          {% for e in form.total_pool_value.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+
+        {% if total_fund_value > 0 %}
+        <div id="varianceCheck" class="alert alert-info small py-2 mb-3">
+          <i class="bi bi-calculator me-1"></i>
+          <strong>Sum of fund values: ${{ "{:,.2f}".format(total_fund_value) }}</strong>
+          <div id="varianceMsg" class="mt-1"></div>
+        </div>
+        {% endif %}
+
+        <div class="alert alert-light border small mb-3">
+          <i class="bi bi-info-circle me-1"></i>
+          <strong>What happens when you initialize:</strong>
+          <ul class="mb-0 mt-1" style="padding-left:1.2rem">
+            <li>A closed snapshot is created for the cutoff month with a <strong>$1.00 unit price</strong></li>
+            <li>Each fund receives units proportional to its value (corpus + earnings)</li>
+            <li>All existing contributions are stamped as bought-in at $1.00</li>
+            <li>From the next month forward, normal month-close will allocate earnings by unit ownership</li>
+          </ul>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100"
+                onclick="return confirm('Initialize this pool? This creates the baseline unit structure. Make sure all funds and their beginning balances are set up first.')">
+          <i class="bi bi-rocket-takeoff me-1"></i> Initialize Pool
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right: Fund Preview -->
+  <div class="col-lg-7">
+    <div class="section-card">
+      <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-wallet2 me-2"></i>Fund Values (Preview)</h6>
+      <p class="text-muted small">
+        These values come from each fund's beginning corpus, beginning earnings, and any imported contributions.
+        Make sure these are correct before initializing — they determine how many units each fund receives.
+      </p>
+
+      {% if fund_preview %}
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Fund</th>
+            <th class="text-end">Corpus</th>
+            <th class="text-end">Earnings</th>
+            <th class="text-end">Total Value</th>
+            <th class="text-end">Units (at $1.00)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fp in fund_preview %}
+          <tr>
+            <td>
+              <a href="{{ url_for('funds.detail', fund_id=fp.fund.id) }}" class="text-decoration-none">
+                {{ fp.fund.name }}
+              </a>
+            </td>
+            <td class="text-end text-money">${{ "{:,.2f}".format(fp.corpus) }}</td>
+            <td class="text-end text-money {% if fp.earnings < 0 %}text-danger{% endif %}">${{ "{:,.2f}".format(fp.earnings) }}</td>
+            <td class="text-end text-money fw-bold">${{ "{:,.2f}".format(fp.total) }}</td>
+            <td class="text-end text-money">{{ "{:,.4f}".format(fp.total) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light fw-bold">
+          <tr>
+            <td>TOTAL</td>
+            <td class="text-end text-money">${{ "{:,.2f}".format(fund_preview | map(attribute='corpus') | sum) }}</td>
+            <td class="text-end text-money">${{ "{:,.2f}".format(fund_preview | map(attribute='earnings') | sum) }}</td>
+            <td class="text-end text-money">${{ "{:,.2f}".format(total_fund_value) }}</td>
+            <td class="text-end text-money">{{ "{:,.4f}".format(total_fund_value) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+      {% else %}
+      <div class="text-center text-muted py-4">
+        <i class="bi bi-exclamation-circle" style="font-size:2rem"></i>
+        <p class="mt-2 mb-0">No active funds in this pool. Create funds with beginning balances first.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if funds %}
+    <div class="section-card mt-3" style="background:#f8fafc; border-left:4px solid #2a5298">
+      <h6 class="fw-bold mb-2"><i class="bi bi-lightbulb me-1"></i> Before You Initialize</h6>
+      <ol class="small text-muted mb-0" style="padding-left:1.2rem">
+        <li>Make sure all funds are created with the correct <strong>beginning corpus</strong> and <strong>beginning earnings</strong> (or historical gifts have been imported via CSV)</li>
+        <li>The sum of fund values should match (or be close to) the pool's total investment value on the statements</li>
+        <li>Any difference may indicate missing funds or a data entry error</li>
+        <li>After initialization, enter the <strong>next month's</strong> vehicle activity and close it normally</li>
+      </ol>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const poolInput = document.getElementById('poolValueInput');
+const varMsg = document.getElementById('varianceMsg');
+const fundTotal = {{ total_fund_value }};
+if (poolInput && varMsg) {
+  function checkVariance() {
+    const pv = parseFloat(poolInput.value) || 0;
+    if (pv <= 0) { varMsg.textContent = ''; return; }
+    const diff = pv - fundTotal;
+    const pct = fundTotal > 0 ? (Math.abs(diff) / fundTotal * 100) : 0;
+    if (Math.abs(diff) < 0.01) {
+      varMsg.innerHTML = '<span class="text-success">Exact match.</span>';
+    } else if (pct < 1) {
+      varMsg.innerHTML = '<span class="text-success">Variance: $' + diff.toLocaleString('en-US',{minimumFractionDigits:2}) + ' (' + pct.toFixed(2) + '%) — within tolerance.</span>';
+    } else {
+      varMsg.innerHTML = '<span class="text-warning">Variance: $' + diff.toLocaleString('en-US',{minimumFractionDigits:2}) + ' (' + pct.toFixed(2) + '%) — check for missing funds or data entry.</span>';
+    }
+  }
+  poolInput.addEventListener('input', checkVariance);
+  checkVariance();
+}
+</script>
+{% endblock %}

@@ -17,6 +17,11 @@
     <a href="{{ url_for('pools.activity_list', pool_id=pool.id) }}" class="btn btn-primary">
       <i class="bi bi-table me-1"></i> Monthly Activity
     </a>
+    {% if current_user.can_approve %}
+    <a href="{{ url_for('pools.initialize_pool', pool_id=pool.id) }}" class="btn btn-success">
+      <i class="bi bi-rocket-takeoff me-1"></i> Initialize Pool
+    </a>
+    {% endif %}
     {% if current_user.can_edit %}
     <a href="{{ url_for('pools.new_vehicle', pool_id=pool.id) }}" class="btn btn-outline-primary">
       <i class="bi bi-plus-circle me-1"></i> Add Vehicle
