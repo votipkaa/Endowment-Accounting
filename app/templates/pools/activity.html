@@ -90,7 +90,7 @@
 {% endif %}
 
 <!-- Cash Flow Reconciliation -->
-{% if recon and recon.has_dtf and (recon.total_gifts > 0 or recon.dtf_additions > 0 or recon.invested_additions > 0) %}
+{% if recon and recon.has_dtf and (recon.total_gifts > 0 or recon.dtf_additions > 0 or recon.invested_transfers_in > 0) %}
 <div class="section-card mb-4">
   <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-arrow-left-right me-2"></i>Cash Flow Reconciliation</h6>
   <div class="row g-3">
@@ -120,23 +120,23 @@
       {% endif %}
     </div>
     <div class="col-md-4">
-      <div class="small fw-semibold text-muted text-uppercase mb-1">Invested in Vehicles</div>
-      <div class="fs-5 text-money fw-bold">${{ "{:,.2f}".format(recon.invested_additions) }}</div>
-      <div class="small text-muted">Additions to investment vehicles</div>
-      {% if recon.invested_additions > 0 and recon.dtf_vs_invested_diff != 0 %}
+      <div class="small fw-semibold text-muted text-uppercase mb-1">Transferred to Vehicles</div>
+      <div class="fs-5 text-money fw-bold">${{ "{:,.2f}".format(recon.invested_transfers_in) }}</div>
+      <div class="small text-muted">Transfers received by investment vehicles</div>
+      {% if recon.invested_transfers_in > 0 and recon.dtf_vs_invested_diff != 0 %}
         {% if recon.dtf_vs_invested_diff < 0 %}
           <div class="text-warning small mt-1">
             <i class="bi bi-exclamation-triangle me-1"></i>
-            ${{ "{:,.2f}".format(recon.dtf_vs_invested_diff|abs) }} added to vehicles without a matching Due To/From withdrawal
+            ${{ "{:,.2f}".format(recon.dtf_vs_invested_diff|abs) }} transferred to vehicles without a matching Due To/From transfer out
           </div>
         {% else %}
           <div class="text-info small mt-1">
             <i class="bi bi-info-circle me-1"></i>
-            ${{ "{:,.2f}".format(recon.dtf_vs_invested_diff) }} withdrawn from Due To/From but not yet invested
+            ${{ "{:,.2f}".format(recon.dtf_vs_invested_diff) }} transferred out of Due To/From but not yet received by vehicles
           </div>
         {% endif %}
-      {% elif recon.invested_additions > 0 %}
-        <div class="text-success small mt-1"><i class="bi bi-check-circle me-1"></i>Matches Due To/From withdrawals</div>
+      {% elif recon.invested_transfers_in > 0 %}
+        <div class="text-success small mt-1"><i class="bi bi-check-circle me-1"></i>Matches Due To/From transfers out</div>
       {% endif %}
     </div>
   </div>
@@ -157,9 +157,9 @@
   <h6 class="fw-bold mb-2"><i class="bi bi-info-circle me-2"></i>Monthly Workflow</h6>
   <ol class="mb-0 small">
     <li><strong>Record Gifts</strong> — Enter contributions under Funds. Cash goes into the Due To/From vehicle first.</li>
-    <li><strong>Enter Activity</strong> — For each vehicle, enter the beginning balance, additions, withdrawals, income, gains, and expenses from the brokerage statement. When moving cash from Due To/From to a vehicle, record a withdrawal in Due To/From and an addition in the vehicle.</li>
+    <li><strong>Enter Activity</strong> — For each vehicle, enter the beginning balance, additions, distributions, transfers, income, gains, and expenses from the brokerage statement. When moving cash from Due To/From to a vehicle, record a <em>Transfer Out</em> in Due To/From and a <em>Transfer In</em> in the vehicle. Transfers are internal movements and do not affect earnings.</li>
     <li><strong>Approve Activity</strong> — Admin approves each vehicle's numbers are correct.</li>
-    <li><strong>Close Month</strong> — Click "Close Month & Allocate Earnings" above. This calculates the unit price (based on earnings only — new gift cash is excluded) and allocates earnings across all funds based on unit ownership.</li>
+    <li><strong>Close Month</strong> — Click "Close Month & Allocate Earnings" above. This calculates the unit price (based on earnings only — contributions, distributions, and transfers are excluded) and allocates earnings across all funds based on unit ownership.</li>
   </ol>
 </div>
 
@@ -173,7 +173,9 @@
           <th>Vehicle</th>
           <th class="text-end">Beg. Balance</th>
           <th class="text-end">Additions</th>
-          <th class="text-end">Withdrawals</th>
+          <th class="text-end">Distributions</th>
+          <th class="text-end">Transfers In</th>
+          <th class="text-end">Transfers Out</th>
           <th class="text-end">Mgmt Exp.</th>
           <th class="text-end">Interest/Div.</th>
           <th class="text-end">Unrealized G/L</th>
@@ -195,6 +197,8 @@
             <td class="text-end text-money">${{ "{:,.2f}".format(act.beginning_balance or 0) }}</td>
             <td class="text-end text-money text-success">${{ "{:,.2f}".format(act.additions or 0) }}</td>
             <td class="text-end text-money text-danger">${{ "{:,.2f}".format(act.withdrawals or 0) }}</td>
+            <td class="text-end text-money text-primary">${{ "{:,.2f}".format(act.transfers_in or 0) }}</td>
+            <td class="text-end text-money text-primary">${{ "{:,.2f}".format(act.transfers_out or 0) }}</td>
             <td class="text-end text-money text-danger">${{ "{:,.2f}".format(act.management_expenses or 0) }}</td>
             <td class="text-end text-money text-success">${{ "{:,.2f}".format(act.interest_dividends or 0) }}</td>
             <td class="text-end text-money {% if (act.unrealized_gains or 0) < 0 %}text-danger{% endif %}">${{ "{:,.2f}".format(act.unrealized_gains or 0) }}</td>
@@ -208,7 +212,7 @@
               {% endif %}
             </td>
           {% else %}
-            <td colspan="8" class="text-muted text-center fst-italic">No data entered</td>
+            <td colspan="10" class="text-muted text-center fst-italic">No data entered</td>
             <td class="text-center"><span class="badge bg-secondary rounded-pill">Not entered</span></td>
           {% endif %}
           <td class="text-end">
@@ -234,7 +238,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="9" class="text-muted text-center py-4">
+          <td colspan="13" class="text-muted text-center py-4">
             No investment vehicles in this pool.
             <a href="{{ url_for('pools.new_vehicle', pool_id=pool.id) }}">Add one.</a>
           </td>
@@ -253,6 +257,12 @@
           </td>
           <td class="text-end text-money text-danger">
             ${{ "{:,.2f}".format(activity.values() | selectattr('withdrawals') | map(attribute='withdrawals') | map('float') | sum) }}
+          </td>
+          <td class="text-end text-money text-primary">
+            ${{ "{:,.2f}".format(activity.values() | selectattr('transfers_in') | map(attribute='transfers_in') | map('float') | sum) }}
+          </td>
+          <td class="text-end text-money text-primary">
+            ${{ "{:,.2f}".format(activity.values() | selectattr('transfers_out') | map(attribute='transfers_out') | map('float') | sum) }}
           </td>
           <td class="text-end text-money text-danger">
             ${{ "{:,.2f}".format(activity.values() | selectattr('management_expenses') | map(attribute='management_expenses') | map('float') | sum) }}

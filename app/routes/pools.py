@@ -29,8 +29,10 @@ class VehicleForm(FlaskForm):
 
 class ActivityForm(FlaskForm):
     beginning_balance   = DecimalField("Beginning Balance", places=2, validators=[Optional()], default=0)
-    additions           = DecimalField("Additions (Cash In)", places=2, validators=[Optional()], default=0)
-    withdrawals         = DecimalField("Withdrawals (Cash Out)", places=2, validators=[Optional()], default=0)
+    additions           = DecimalField("Additions (New Money In)", places=2, validators=[Optional()], default=0)
+    withdrawals         = DecimalField("Distributions (Cash Out of Pool)", places=2, validators=[Optional()], default=0)
+    transfers_in        = DecimalField("Transfers In (from other vehicles)", places=2, validators=[Optional()], default=0)
+    transfers_out       = DecimalField("Transfers Out (to other vehicles)", places=2, validators=[Optional()], default=0)
     management_expenses = DecimalField("Management / Admin Expenses", places=2, validators=[Optional()], default=0)
     interest_dividends  = DecimalField("Interest & Dividend Income", places=2, validators=[Optional()], default=0)
     unrealized_gains    = DecimalField("Unrealized Gains (Losses)", places=2, validators=[Optional()], default=0)
@@ -193,31 +195,32 @@ def activity_list(pool_id):
     dtf_vehicle = pool.vehicles.filter_by(is_cash_clearing=True, is_active=True).first()
     dtf_activity = None
     dtf_additions = Decimal("0")
-    dtf_withdrawals = Decimal("0")
+    dtf_transfers_out = Decimal("0")
     if dtf_vehicle:
         dtf_activity = VehicleMonthlyActivity.query.filter_by(
             vehicle_id=dtf_vehicle.id, year=year, month=month, is_voided=False).first()
         if dtf_activity:
             dtf_additions = Decimal(str(dtf_activity.additions or 0))
-            dtf_withdrawals = Decimal(str(dtf_activity.withdrawals or 0))
+            # Cash moved from DTF to investment vehicles = transfers_out
+            dtf_transfers_out = Decimal(str(dtf_activity.transfers_out or 0))
 
-    # Non-clearing vehicle additions (money actually invested)
-    invested_additions = Decimal("0")
+    # Non-clearing vehicle transfers in (money received from DTF)
+    invested_transfers_in = Decimal("0")
     for v in vehicles:
         if v.is_cash_clearing:
             continue
         act = activity.get(v.id)
         if act:
-            invested_additions += Decimal(str(act.additions or 0))
+            invested_transfers_in += Decimal(str(act.transfers_in or 0))
 
     # Reconciliation flags
     recon = {
         "total_gifts": total_gifts,
         "dtf_additions": dtf_additions,
-        "dtf_withdrawals": dtf_withdrawals,
-        "invested_additions": invested_additions,
+        "dtf_transfers_out": dtf_transfers_out,
+        "invested_transfers_in": invested_transfers_in,
         "gift_vs_dtf_diff": total_gifts - dtf_additions,
-        "dtf_vs_invested_diff": dtf_withdrawals - invested_additions,
+        "dtf_vs_invested_diff": dtf_transfers_out - invested_transfers_in,
         "has_dtf": dtf_vehicle is not None,
     }
 
@@ -261,6 +264,8 @@ def enter_activity(pool_id, vehicle_id, year, month):
         existing.beginning_balance   = form.beginning_balance.data or 0
         existing.additions           = form.additions.data or 0
         existing.withdrawals         = form.withdrawals.data or 0
+        existing.transfers_in        = form.transfers_in.data or 0
+        existing.transfers_out       = form.transfers_out.data or 0
         existing.management_expenses = form.management_expenses.data or 0
         existing.interest_dividends  = form.interest_dividends.data or 0
         existing.unrealized_gains    = form.unrealized_gains.data or 0
@@ -271,6 +276,8 @@ def enter_activity(pool_id, vehicle_id, year, month):
             (existing.beginning_balance or 0)
             + (existing.additions or 0)
             - (existing.withdrawals or 0)
+            + (existing.transfers_in or 0)
+            - (existing.transfers_out or 0)
             + (existing.interest_dividends or 0)
             + (existing.unrealized_gains or 0)
             + (existing.realized_gains or 0)
@@ -316,11 +323,11 @@ def close_month(pool_id, year, month):
     """Calculate unit price for the month and update all fund snapshots.
 
     IMPORTANT — Unit price calculation:
-    The unit price must reflect only EARNINGS, not new money flowing in.
-    Formula:  unit_price = (total_pool_value − new_contribution_cash) / existing_units
+    The unit price must reflect only EARNINGS, not new money flowing in or out.
+    Formula:  unit_price = (total_pool_value − new_contribution_cash + distribution_cash) / existing_units
 
-    Without this adjustment, new contribution cash would be treated as
-    earnings and incorrectly inflate existing unit holders' balances.
+    Internal transfers between vehicles net to zero across the pool and do NOT
+    affect unit price — they merely move cash between vehicles.
     """
     if not current_user.can_approve:
         abort(403)

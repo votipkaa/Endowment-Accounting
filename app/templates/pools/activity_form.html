@@ -55,29 +55,59 @@
         </div>
 
         <hr class="my-3">
-        <p class="fw-semibold text-muted small text-uppercase mb-2">Cash Flows</p>
+        <p class="fw-semibold text-muted small text-uppercase mb-2">
+          <i class="bi bi-cash-stack me-1"></i>External Cash Flows
+        </p>
+        <p class="small text-muted mb-3">New money entering or leaving the pool entirely (gifts invested, distributions paid out).</p>
 
         <div class="row g-3 mb-3">
           <div class="col-6">
-            <label class="form-label">Additions (Cash In)</label>
+            <label class="form-label">Additions (New Money In)</label>
             <div class="input-group">
               <span class="input-group-text text-success">$</span>
               {{ form.additions(class="form-control calc-field", id="additions", step="0.01") }}
             </div>
-            <small class="text-muted">New money deposited / gifts invested</small>
+            <small class="text-muted">New external money — gifts invested in this vehicle</small>
           </div>
           <div class="col-6">
-            <label class="form-label">Withdrawals (Cash Out)</label>
+            <label class="form-label">Distributions (Cash Out of Pool)</label>
             <div class="input-group">
               <span class="input-group-text text-danger">$</span>
               {{ form.withdrawals(class="form-control calc-field", id="withdrawals", step="0.01") }}
             </div>
-            <small class="text-muted">Distributions / transfers out</small>
+            <small class="text-muted">Money leaving the pool — paid to beneficiaries</small>
           </div>
         </div>
 
         <hr class="my-3">
-        <p class="fw-semibold text-muted small text-uppercase mb-2">Investment Activity</p>
+        <p class="fw-semibold text-muted small text-uppercase mb-2">
+          <i class="bi bi-arrow-left-right me-1"></i>Internal Transfers
+        </p>
+        <p class="small text-muted mb-3">Cash moved between vehicles within this pool (e.g., Due To/From → investment vehicle). Transfers do not affect earnings.</p>
+
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label">Transfers In</label>
+            <div class="input-group">
+              <span class="input-group-text text-primary">$</span>
+              {{ form.transfers_in(class="form-control calc-field", id="transfers_in", step="0.01") }}
+            </div>
+            <small class="text-muted">Cash received from another vehicle in this pool</small>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Transfers Out</label>
+            <div class="input-group">
+              <span class="input-group-text text-primary">$</span>
+              {{ form.transfers_out(class="form-control calc-field", id="transfers_out", step="0.01") }}
+            </div>
+            <small class="text-muted">Cash sent to another vehicle in this pool</small>
+          </div>
+        </div>
+
+        <hr class="my-3">
+        <p class="fw-semibold text-muted small text-uppercase mb-2">
+          <i class="bi bi-graph-up me-1"></i>Investment Activity
+        </p>
 
         <div class="row g-3 mb-3">
           <div class="col-6">
@@ -117,7 +147,7 @@
         <div class="section-card" style="background: #f8fafc; border: 2px solid #e2e8f0;">
           <label class="form-label fw-bold">Calculated Ending Balance</label>
           <div class="display-6 fw-bold text-money" id="calc_ending" style="color: #1e3a5f;">$0.00</div>
-          <small class="text-muted">Beginning + Additions − Withdrawals + Income − Expenses ± Gains/Losses</small>
+          <small class="text-muted">Beginning + Additions − Distributions + Transfers In − Transfers Out + Income − Expenses ± Gains/Losses</small>
         </div>
 
         <div class="mb-4 mt-3">
@@ -141,14 +171,16 @@
 {% block scripts %}
 <script>
 function recalc() {
-  const beg  = parseFloat(document.getElementById('beg_bal').value)      || 0;
-  const add  = parseFloat(document.getElementById('additions').value)    || 0;
-  const wth  = parseFloat(document.getElementById('withdrawals').value)  || 0;
-  const exp  = parseFloat(document.getElementById('mgmt_exp').value)     || 0;
-  const inc  = parseFloat(document.getElementById('int_div').value)      || 0;
-  const unrl = parseFloat(document.getElementById('unreal').value)       || 0;
-  const real = parseFloat(document.getElementById('real').value)         || 0;
-  const end  = beg + add - wth - exp + inc + unrl + real;
+  const beg  = parseFloat(document.getElementById('beg_bal').value)         || 0;
+  const add  = parseFloat(document.getElementById('additions').value)       || 0;
+  const wth  = parseFloat(document.getElementById('withdrawals').value)     || 0;
+  const tin  = parseFloat(document.getElementById('transfers_in').value)    || 0;
+  const tout = parseFloat(document.getElementById('transfers_out').value)   || 0;
+  const exp  = parseFloat(document.getElementById('mgmt_exp').value)        || 0;
+  const inc  = parseFloat(document.getElementById('int_div').value)         || 0;
+  const unrl = parseFloat(document.getElementById('unreal').value)          || 0;
+  const real = parseFloat(document.getElementById('real').value)            || 0;
+  const end  = beg + add - wth + tin - tout - exp + inc + unrl + real;
   const el   = document.getElementById('calc_ending');
   el.textContent = '$' + end.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
   el.style.color = end < 0 ? '#dc2626' : '#1e3a5f';

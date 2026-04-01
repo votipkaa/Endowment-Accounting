@@ -201,6 +201,12 @@
   <a href="{{ url_for('reports.reconciliation') }}" class="nav-link {% if request.endpoint == 'reports.reconciliation' %}active{% endif %}">
     <i class="bi bi-arrow-left-right"></i> Reconciliation
   </a>
+  <a href="{{ url_for('reports.earnings_allocation') }}" class="nav-link {% if request.endpoint == 'reports.earnings_allocation' %}active{% endif %}">
+    <i class="bi bi-pie-chart"></i> Earnings Allocation
+  </a>
+  <a href="{{ url_for('reports.fund_summary') }}" class="nav-link {% if request.endpoint == 'reports.fund_summary' %}active{% endif %}">
+    <i class="bi bi-wallet2"></i> Fund Summary
+  </a>
   <a href="{{ url_for('reports.audit') }}" class="nav-link {% if request.endpoint == 'reports.audit' %}active{% endif %}">
     <i class="bi bi-shield-check"></i> Audit Log
   </a>

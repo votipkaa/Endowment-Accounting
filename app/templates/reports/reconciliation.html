@@ -59,22 +59,23 @@
         <div>
           {% if row.snap and row.snap.is_closed %}
             <span class="badge bg-success">Closed</span>
+            <span class="badge bg-light text-dark ms-1">Unit Price: ${{ "%.6f"|format(row.snap.unit_price) }}</span>
           {% else %}
             <span class="badge bg-warning">Open</span>
           {% endif %}
         </div>
       </div>
 
-      <!-- Three Reconciliation Sections -->
+      <!-- Four Reconciliation Sections -->
       <div class="row g-3 mb-4">
         <!-- Value Reconciliation -->
-        <div class="col-md-4">
+        <div class="col-md-3">
           <div class="stat-card">
             <div class="label">Vehicle Ending Balances</div>
             <div class="value text-money">${{ "{:,.2f}".format(row.vehicle_total_ending) }}</div>
           </div>
           <div class="stat-card mt-3">
-            <div class="label">Fund Total Value</div>
+            <div class="label">Fund Values (as of month)</div>
             <div class="value text-money">${{ "{:,.2f}".format(row.fund_total_value) }}</div>
           </div>
           <div class="stat-card mt-3 {% if row.value_variance == 0 %}success{% else %}danger{% endif %}">
@@ -91,13 +92,13 @@
         </div>
 
         <!-- Additions Reconciliation -->
-        <div class="col-md-4">
+        <div class="col-md-3">
           <div class="stat-card">
-            <div class="label">Vehicle Additions</div>
+            <div class="label">Vehicle Additions (New Money)</div>
             <div class="value text-money">${{ "{:,.2f}".format(row.vehicle_total_additions) }}</div>
           </div>
           <div class="stat-card mt-3">
-            <div class="label">Fund Contributions</div>
+            <div class="label">Fund Contributions (Gifts)</div>
             <div class="value text-money">${{ "{:,.2f}".format(row.fund_total_contributions) }}</div>
           </div>
           <div class="stat-card mt-3 {% if row.additions_variance == 0 %}success{% else %}danger{% endif %}">
@@ -113,24 +114,47 @@
           </div>
         </div>
 
-        <!-- Withdrawals Reconciliation -->
-        <div class="col-md-4">
+        <!-- Distributions Reconciliation -->
+        <div class="col-md-3">
           <div class="stat-card">
-            <div class="label">Vehicle Withdrawals</div>
-            <div class="value text-money">${{ "{:,.2f}".format(row.vehicle_total_withdrawals) }}</div>
+            <div class="label">Vehicle Distributions</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.vehicle_total_distributions) }}</div>
           </div>
           <div class="stat-card mt-3">
             <div class="label">Fund Distributions</div>
             <div class="value text-money">${{ "{:,.2f}".format(row.fund_total_distributions) }}</div>
           </div>
-          <div class="stat-card mt-3 {% if row.withdrawals_variance == 0 %}success{% else %}danger{% endif %}">
+          <div class="stat-card mt-3 {% if row.distributions_variance == 0 %}success{% else %}danger{% endif %}">
             <div class="label">Variance</div>
-            <div class="value text-money">${{ "{:,.2f}".format(row.withdrawals_variance) }}</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.distributions_variance) }}</div>
             <div class="sub">
-              {% if row.withdrawals_variance == 0 %}
+              {% if row.distributions_variance == 0 %}
                 <i class="bi bi-check-circle-fill text-success"></i> Balanced
               {% else %}
                 <i class="bi bi-exclamation-triangle-fill text-danger"></i> Mismatch
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Transfers Check -->
+        <div class="col-md-3">
+          <div class="stat-card">
+            <div class="label">Total Transfers In</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.vehicle_total_transfers_in) }}</div>
+          </div>
+          <div class="stat-card mt-3">
+            <div class="label">Total Transfers Out</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.vehicle_total_transfers_out) }}</div>
+          </div>
+          <div class="stat-card mt-3 {% if row.net_transfers == 0 %}success{% else %}danger{% endif %}">
+            <div class="label">Net (should be $0)</div>
+            <div class="value text-money">${{ "{:,.2f}".format(row.net_transfers) }}</div>
+            <div class="sub">
+              {% if row.net_transfers == 0 %}
+                <i class="bi bi-check-circle-fill text-success"></i> Balanced
+              {% else %}
+                <i class="bi bi-exclamation-triangle-fill text-warning"></i> Transfers don't net to zero
               {% endif %}
             </div>
           </div>
@@ -147,25 +171,32 @@
         <div class="collapse mt-3" id="details-{{ row.pool.id }}">
           <div class="row g-4">
             <!-- Vehicles Table -->
-            <div class="col-md-6">
+            <div class="col-md-7">
               <h6 class="mb-3">Vehicles</h6>
               <div class="table-responsive">
                 <table class="table table-sm table-hover">
                   <thead>
                     <tr>
                       <th>Vehicle</th>
-                      <th class="text-end">Ending Balance</th>
+                      <th class="text-end">Ending Bal.</th>
                       <th class="text-end">Additions</th>
-                      <th class="text-end">Withdrawals</th>
+                      <th class="text-end">Distributions</th>
+                      <th class="text-end">Xfer In</th>
+                      <th class="text-end">Xfer Out</th>
                     </tr>
                   </thead>
                   <tbody>
                     {% for vehicle in row.vehicle_details %}
                       <tr {% if not vehicle.has_data %}class="table-secondary"{% endif %}>
-                        <td>{{ vehicle.name }}</td>
+                        <td>
+                          {{ vehicle.name }}
+                          {% if vehicle.is_clearing %}<span class="badge bg-info text-dark" style="font-size:.6rem">Clearing</span>{% endif %}
+                        </td>
                         <td class="text-end text-money">${{ "{:,.2f}".format(vehicle.ending) }}</td>
                         <td class="text-end text-money">${{ "{:,.2f}".format(vehicle.additions) }}</td>
-                        <td class="text-end text-money">${{ "{:,.2f}".format(vehicle.withdrawals) }}</td>
+                        <td class="text-end text-money">${{ "{:,.2f}".format(vehicle.distributions) }}</td>
+                        <td class="text-end text-money">${{ "{:,.2f}".format(vehicle.transfers_in) }}</td>
+                        <td class="text-end text-money">${{ "{:,.2f}".format(vehicle.transfers_out) }}</td>
                       </tr>
                     {% endfor %}
                   </tbody>
@@ -174,8 +205,8 @@
             </div>
 
             <!-- Funds Table -->
-            <div class="col-md-6">
-              <h6 class="mb-3">Funds</h6>
+            <div class="col-md-5">
+              <h6 class="mb-3">Funds (as of {{ months[month - 1] }} {{ year }})</h6>
               <div class="table-responsive">
                 <table class="table table-sm table-hover">
                   <thead>

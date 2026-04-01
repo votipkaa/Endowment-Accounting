@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Fund Summary Report{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>Fund Summary Report</h2>
+  <p class="text-muted mb-0">All funds with corpus, earnings, and available drawdown based on spend rate.</p>
+</div>
+
+<nav aria-label="breadcrumb" class="mb-4">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Home</a></li>
+    <li class="breadcrumb-item active">Fund Summary</li>
+  </ol>
+</nav>
+
+<!-- Filters -->
+<div class="section-card mb-4">
+  <form method="GET" class="row g-3 align-items-end">
+    {% if pools %}
+    <div class="col-md-3">
+      <label class="form-label">Pool</label>
+      <select name="pool_id" class="form-select" onchange="this.form.submit()">
+        <option value="">All Pools</option>
+        {% for pool in pools %}
+          <option value="{{ pool.id }}" {% if pool_filter == pool.id %}selected{% endif %}>{{ pool.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="col-md-3">
+      <label class="form-label">Restriction</label>
+      <select name="restriction" class="form-select" onchange="this.form.submit()">
+        <option value="">All Types</option>
+        <option value="permanently_restricted" {% if restriction_filter == 'permanently_restricted' %}selected{% endif %}>Permanently Restricted</option>
+        <option value="temporarily_restricted" {% if restriction_filter == 'temporarily_restricted' %}selected{% endif %}>Temporarily Restricted</option>
+        <option value="unrestricted" {% if restriction_filter == 'unrestricted' %}selected{% endif %}>Unrestricted</option>
+      </select>
+    </div>
+  </form>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="label">Total Fund Value</div>
+      <div class="value text-money">${{ "{:,.2f}".format(total_value) }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="label">Total Corpus</div>
+      <div class="value text-money">${{ "{:,.2f}".format(total_corpus) }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="label">Total Earnings</div>
+      <div class="value text-money {% if total_earnings < 0 %}text-danger{% endif %}">${{ "{:,.2f}".format(total_earnings) }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="label">Available to Distribute</div>
+      <div class="value text-money">${{ "{:,.2f}".format(total_drawdown) }}</div>
+      {% if underwater_count > 0 %}
+      <div class="sub text-warning">
+        <i class="bi bi-exclamation-triangle"></i> {{ underwater_count }} fund{{ 's' if underwater_count > 1 }} underwater
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Fund Table -->
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Fund Name</th>
+            <th>Pool</th>
+            <th>Restriction</th>
+            <th class="text-end">Corpus</th>
+            <th class="text-end">Current Value</th>
+            <th class="text-end">Earnings</th>
+            <th class="text-end">Units Held</th>
+            <th class="text-end">Spend Rate</th>
+            <th class="text-end">Available Drawdown</th>
+            <th class="text-end">Total Distributed</th>
+            <th class="text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="fw-semibold">
+              <a href="{{ url_for('funds.detail', fund_id=row.fund.id) }}" class="text-decoration-none">
+                {{ row.fund.name }}
+              </a>
+            </td>
+            <td class="text-muted small">{{ row.pool_name }}</td>
+            <td>
+              {% if row.fund.restriction.value == 'permanently_restricted' %}
+                <span class="badge badge-perm rounded-pill">Perm.</span>
+              {% elif row.fund.restriction.value == 'temporarily_restricted' %}
+                <span class="badge badge-temp rounded-pill">Temp.</span>
+              {% else %}
+                <span class="badge badge-unrestricted rounded-pill">Unrestricted</span>
+              {% endif %}
+            </td>
+            <td class="text-end text-money">${{ "{:,.2f}".format(row.corpus) }}</td>
+            <td class="text-end text-money fw-semibold">${{ "{:,.2f}".format(row.current_value) }}</td>
+            <td class="text-end text-money {% if row.earnings < 0 %}text-danger{% endif %}">
+              ${{ "{:,.2f}".format(row.earnings) }}
+            </td>
+            <td class="text-end text-money">{{ "{:,.4f}".format(row.units_held) }}</td>
+            <td class="text-end">{{ "%.1f"|format(row.spend_rate_pct) }}%</td>
+            <td class="text-end text-money fw-semibold {% if row.drawdown > 0 %}text-success{% endif %}">
+              ${{ "{:,.2f}".format(row.drawdown) }}
+            </td>
+            <td class="text-end text-money text-muted">${{ "{:,.2f}".format(row.total_distributed) }}</td>
+            <td class="text-center">
+              {% if row.is_underwater %}
+                <span class="badge bg-danger rounded-pill">
+                  <i class="bi bi-exclamation-triangle-fill me-1"></i>Underwater
+                </span>
+              {% else %}
+                <span class="text-success"><i class="bi bi-check-circle-fill"></i></span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="11" class="text-muted text-center py-4">No funds match the selected filters.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% if rows %}
+        <tfoot class="table-light fw-bold">
+          <tr>
+            <td colspan="3">TOTAL ({{ rows|length }} funds)</td>
+            <td class="text-end text-money">${{ "{:,.2f}".format(total_corpus) }}</td>
+            <td class="text-end text-money">${{ "{:,.2f}".format(total_value) }}</td>
+            <td class="text-end text-money {% if total_earnings < 0 %}text-danger{% endif %}">${{ "{:,.2f}".format(total_earnings) }}</td>
+            <td></td>
+            <td></td>
+            <td class="text-end text-money">${{ "{:,.2f}".format(total_drawdown) }}</td>
+            <td></td>
+            <td></td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

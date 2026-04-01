@@ -196,8 +196,10 @@ class VehicleMonthlyActivity(db.Model):
     month               = db.Column(db.Integer, nullable=False)  # 1-12
 
     beginning_balance   = db.Column(db.Numeric(18, 4), default=0)
-    additions           = db.Column(db.Numeric(18, 4), default=0)   # Cash added (gifts invested, transfers in)
-    withdrawals         = db.Column(db.Numeric(18, 4), default=0)   # Cash removed (distributions, transfers out)
+    additions           = db.Column(db.Numeric(18, 4), default=0)   # External cash added (new gifts invested)
+    withdrawals         = db.Column(db.Numeric(18, 4), default=0)   # Distributions — cash leaving the pool
+    transfers_in        = db.Column(db.Numeric(18, 4), default=0)   # Internal: cash moved in from another vehicle
+    transfers_out       = db.Column(db.Numeric(18, 4), default=0)   # Internal: cash moved out to another vehicle
     management_expenses = db.Column(db.Numeric(18, 4), default=0)
     interest_dividends  = db.Column(db.Numeric(18, 4), default=0)
     unrealized_gains    = db.Column(db.Numeric(18, 4), default=0)
@@ -218,9 +220,20 @@ class VehicleMonthlyActivity(db.Model):
 
     @property
     def net_activity(self):
+        """Net change = cash flows + transfers + investment performance."""
         return (float(self.additions or 0)
                 - float(self.withdrawals or 0)
+                + float(self.transfers_in or 0)
+                - float(self.transfers_out or 0)
                 + float(self.interest_dividends or 0)
+                + float(self.unrealized_gains or 0)
+                + float(self.realized_gains or 0)
+                - float(self.management_expenses or 0))
+
+    @property
+    def net_earnings(self):
+        """Investment performance only — excludes cash flows and transfers."""
+        return (float(self.interest_dividends or 0)
                 + float(self.unrealized_gains or 0)
                 + float(self.realized_gains or 0)
                 - float(self.management_expenses or 0))
