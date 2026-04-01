@@ -57,11 +57,21 @@ def new_pool():
         pool = InvestmentPool(name=form.name.data, description=form.description.data)
         db.session.add(pool)
         db.session.flush()
+
+        # Auto-create a Due To/From (cash clearing) vehicle for this pool
+        dtf = InvestmentVehicle(
+            pool_id=pool.id,
+            name="Due To/From",
+            description="Cash clearing account — holds gift cash before it is invested in a vehicle.",
+            is_cash_clearing=True,
+        )
+        db.session.add(dtf)
+
         db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.CREATE,
             entity_type="InvestmentPool", entity_id=pool.id,
-            description=f"Created pool '{pool.name}'", ip_address=request.remote_addr))
+            description=f"Created pool '{pool.name}' with Due To/From vehicle", ip_address=request.remote_addr))
         db.session.commit()
-        flash(f"Pool '{pool.name}' created.", "success")
+        flash(f"Pool '{pool.name}' created with a Due To/From clearing vehicle.", "success")
         return redirect(url_for("pools.detail", pool_id=pool.id))
     return render_template("pools/form.html", form=form, title="New Investment Pool")
 
@@ -98,6 +108,36 @@ def edit_pool(pool_id):
         flash("Pool updated.", "success")
         return redirect(url_for("pools.detail", pool_id=pool.id))
     return render_template("pools/form.html", form=form, title="Edit Pool", pool=pool)
+
+
+# ── Add Due To/From to existing pool ───────────
+
+@pools_bp.route("/<int:pool_id>/add-due-to-from", methods=["POST"])
+@login_required
+def add_due_to_from(pool_id):
+    """Add a Due To/From clearing vehicle to a pool that doesn't have one."""
+    if not current_user.can_edit:
+        abort(403)
+    pool = InvestmentPool.query.get_or_404(pool_id)
+    existing = pool.vehicles.filter_by(is_cash_clearing=True).first()
+    if existing:
+        flash("This pool already has a Due To/From vehicle.", "info")
+        return redirect(url_for("pools.activity_list", pool_id=pool_id))
+
+    dtf = InvestmentVehicle(
+        pool_id=pool_id,
+        name="Due To/From",
+        description="Cash clearing account — holds gift cash before it is invested.",
+        is_cash_clearing=True,
+    )
+    db.session.add(dtf)
+    db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.CREATE,
+        entity_type="InvestmentVehicle", entity_id=pool_id,
+        description=f"Added Due To/From vehicle to pool '{pool.name}'",
+        ip_address=request.remote_addr))
+    db.session.commit()
+    flash("Due To/From clearing vehicle added.", "success")
+    return redirect(url_for("pools.activity_list", pool_id=pool_id))
 
 
 # ── Vehicle CRUD ───────────────────────────────
@@ -137,9 +177,53 @@ def activity_list(pool_id):
         act = VehicleMonthlyActivity.query.filter_by(vehicle_id=v.id, year=year, month=month).first()
         activity[v.id] = act
     snapshot = PoolMonthlySnapshot.query.filter_by(pool_id=pool_id, year=year, month=month).first()
+
+    # ── Cash flow reconciliation data ──
+    # Total contributions buying in this month
+    contribs_this_month = (FundContribution.query
+        .join(Fund)
+        .filter(Fund.pool_id == pool_id,
+                FundContribution.buy_in_year == year,
+                FundContribution.buy_in_month == month,
+                FundContribution.is_voided == False)
+        .all())
+    total_gifts = sum(Decimal(str(c.amount)) for c in contribs_this_month)
+
+    # Due To/From vehicle activity
+    dtf_vehicle = pool.vehicles.filter_by(is_cash_clearing=True, is_active=True).first()
+    dtf_activity = None
+    dtf_additions = Decimal("0")
+    dtf_withdrawals = Decimal("0")
+    if dtf_vehicle:
+        dtf_activity = VehicleMonthlyActivity.query.filter_by(
+            vehicle_id=dtf_vehicle.id, year=year, month=month, is_voided=False).first()
+        if dtf_activity:
+            dtf_additions = Decimal(str(dtf_activity.additions or 0))
+            dtf_withdrawals = Decimal(str(dtf_activity.withdrawals or 0))
+
+    # Non-clearing vehicle additions (money actually invested)
+    invested_additions = Decimal("0")
+    for v in vehicles:
+        if v.is_cash_clearing:
+            continue
+        act = activity.get(v.id)
+        if act:
+            invested_additions += Decimal(str(act.additions or 0))
+
+    # Reconciliation flags
+    recon = {
+        "total_gifts": total_gifts,
+        "dtf_additions": dtf_additions,
+        "dtf_withdrawals": dtf_withdrawals,
+        "invested_additions": invested_additions,
+        "gift_vs_dtf_diff": total_gifts - dtf_additions,
+        "dtf_vs_invested_diff": dtf_withdrawals - invested_additions,
+        "has_dtf": dtf_vehicle is not None,
+    }
+
     return render_template("pools/activity.html",
         pool=pool, vehicles=vehicles, activity=activity,
-        snapshot=snapshot, year=year, month=month)
+        snapshot=snapshot, year=year, month=month, recon=recon)
 
 
 @pools_bp.route("/<int:pool_id>/activity/<int:vehicle_id>/<int:year>/<int:month>", methods=["GET", "POST"])
@@ -229,12 +313,20 @@ def approve_activity(pool_id, vehicle_id, year, month):
 @pools_bp.route("/<int:pool_id>/close-month/<int:year>/<int:month>", methods=["POST"])
 @login_required
 def close_month(pool_id, year, month):
-    """Calculate unit price for the month and update all fund snapshots."""
+    """Calculate unit price for the month and update all fund snapshots.
+
+    IMPORTANT — Unit price calculation:
+    The unit price must reflect only EARNINGS, not new money flowing in.
+    Formula:  unit_price = (total_pool_value − new_contribution_cash) / existing_units
+
+    Without this adjustment, new contribution cash would be treated as
+    earnings and incorrectly inflate existing unit holders' balances.
+    """
     if not current_user.can_approve:
         abort(403)
     pool = InvestmentPool.query.get_or_404(pool_id)
 
-    # Sum all approved vehicle ending balances for this pool/month
+    # Sum all vehicle ending balances for this pool/month
     vehicles = pool.vehicles.filter_by(is_active=True).all()
     total_value = Decimal("0")
     for v in vehicles:
@@ -258,13 +350,12 @@ def close_month(pool_id, year, month):
         adjustment_total = sum(Decimal(str(a.amount)) for a in adjustments)
         snap.total_value = total_value + adjustment_total
 
-    # Calculate total units: existing units from last month + new buy-ins this month
-    # Get previous month snapshot for existing units
+    # ── Get existing units from prior month ──
     prev_year, prev_month = (year, month - 1) if month > 1 else (year - 1, 12)
     prev_snap = PoolMonthlySnapshot.query.filter_by(pool_id=pool_id, year=prev_year, month=prev_month).first()
     existing_units = Decimal(str(prev_snap.total_units)) if prev_snap else Decimal("0")
 
-    # New units from contributions that buy in this month
+    # ── Find new contributions buying in this month ──
     new_contributions = (FundContribution.query
         .join(Fund)
         .filter(Fund.pool_id == pool_id,
@@ -273,16 +364,38 @@ def close_month(pool_id, year, month):
                 FundContribution.is_voided == False)
         .all())
 
-    # Calculate unit price BEFORE new buy-ins (new money buys at closing price)
-    if existing_units > 0 and total_value > 0:
-        unit_price = total_value / existing_units
-    elif total_value > 0:
-        unit_price = Decimal("1.000000")  # Initial price
-        existing_units = Decimal("0")
+    # Total NEW cash from contributions — this is NOT earnings
+    new_cash = sum(Decimal(str(c.amount)) for c in new_contributions)
+
+    # Also account for distributions (cash leaving the pool)
+    month_distributions = (Distribution.query
+        .join(Fund)
+        .filter(Fund.pool_id == pool_id,
+                Distribution.is_voided == False,
+                db.extract('year', Distribution.distribution_date) == year,
+                db.extract('month', Distribution.distribution_date) == month)
+        .all())
+    dist_cash = sum(Decimal(str(d.amount)) for d in month_distributions)
+
+    # ── Calculate unit price ──
+    # Subtract new contribution cash (and add back distribution cash) so
+    # the price only reflects investment performance, not cash flows.
+    #
+    #   adjusted_value = total_pool_value − new_contributions + distributions
+    #   unit_price     = adjusted_value / existing_units
+    #
+    # New money then buys units AT this price. Distributions redeem units
+    # at this price in _update_fund_snapshot.
+    if existing_units > 0:
+        adjusted_value = snap.total_value - new_cash + dist_cash
+        unit_price = adjusted_value / existing_units
+    elif snap.total_value > 0:
+        # Very first month (no existing units) — set initial price
+        unit_price = Decimal("1.000000")
     else:
         unit_price = Decimal("1.000000")
 
-    # Process new contributions at this unit price
+    # ── Process new contributions at this unit price ──
     new_units = Decimal("0")
     for contrib in new_contributions:
         if unit_price > 0:
@@ -297,18 +410,24 @@ def close_month(pool_id, year, month):
 
     db.session.flush()
 
-    # Update fund snapshots for all active funds in this pool
+    # ── Update fund snapshots ──
     funds = Fund.query.filter_by(pool_id=pool_id, is_active=True).all()
     for fund in funds:
         _update_fund_snapshot(fund, year, month, snap)
 
     db.session.add(AuditLog(user_id=current_user.id, action=AuditAction.APPROVE,
         entity_type="PoolMonthlySnapshot", entity_id=snap.id,
-        description=f"Closed month {year}-{month:02d} for pool '{pool.name}'. Unit price: ${unit_price:.4f}",
+        description=(f"Closed month {year}-{month:02d} for pool '{pool.name}'. "
+                     f"Unit price: ${unit_price:.6f}, New cash: ${float(new_cash):,.2f}"),
         ip_address=request.remote_addr))
     db.session.commit()
     adj_msg = f" (includes ${float(adjustment_total):,.2f} in adjustments)" if adjustment_total else ""
-    flash(f"Month closed. Unit price: ${float(unit_price):.4f}. Total pool value: ${float(snap.total_value):,.2f}{adj_msg}", "success")
+    new_cash_msg = f" New contributions: ${float(new_cash):,.2f} ({float(new_units):,.4f} units)." if new_cash else ""
+    flash(
+        f"Month closed. Unit price: ${float(unit_price):.6f}. "
+        f"Total pool value: ${float(snap.total_value):,.2f}{adj_msg}.{new_cash_msg}",
+        "success"
+    )
     return redirect(url_for("pools.activity_list", pool_id=pool_id, year=year, month=month))
 
 

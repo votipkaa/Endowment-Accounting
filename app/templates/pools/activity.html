@@ -89,13 +89,77 @@
 </div>
 {% endif %}
 
+<!-- Cash Flow Reconciliation -->
+{% if recon and recon.has_dtf and (recon.total_gifts > 0 or recon.dtf_additions > 0 or recon.invested_additions > 0) %}
+<div class="section-card mb-4">
+  <h6 class="fw-bold mb-3" style="color:#1e3a5f"><i class="bi bi-arrow-left-right me-2"></i>Cash Flow Reconciliation</h6>
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="small fw-semibold text-muted text-uppercase mb-1">Gifts Received</div>
+      <div class="fs-5 text-money fw-bold">${{ "{:,.2f}".format(recon.total_gifts) }}</div>
+      <div class="small text-muted">Contributions buying in this month</div>
+    </div>
+    <div class="col-md-4">
+      <div class="small fw-semibold text-muted text-uppercase mb-1">Due To/From Deposits</div>
+      <div class="fs-5 text-money fw-bold">${{ "{:,.2f}".format(recon.dtf_additions) }}</div>
+      <div class="small text-muted">Cash deposited into clearing account</div>
+      {% if recon.gift_vs_dtf_diff != 0 %}
+        {% if recon.gift_vs_dtf_diff > 0 %}
+          <div class="text-warning small mt-1">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            ${{ "{:,.2f}".format(recon.gift_vs_dtf_diff) }} in gifts not yet deposited to Due To/From
+          </div>
+        {% else %}
+          <div class="text-info small mt-1">
+            <i class="bi bi-info-circle me-1"></i>
+            ${{ "{:,.2f}".format(recon.gift_vs_dtf_diff|abs) }} more in Due To/From than gifts this month (prior month deposits?)
+          </div>
+        {% endif %}
+      {% else %}
+        <div class="text-success small mt-1"><i class="bi bi-check-circle me-1"></i>Matches gifts received</div>
+      {% endif %}
+    </div>
+    <div class="col-md-4">
+      <div class="small fw-semibold text-muted text-uppercase mb-1">Invested in Vehicles</div>
+      <div class="fs-5 text-money fw-bold">${{ "{:,.2f}".format(recon.invested_additions) }}</div>
+      <div class="small text-muted">Additions to investment vehicles</div>
+      {% if recon.invested_additions > 0 and recon.dtf_vs_invested_diff != 0 %}
+        {% if recon.dtf_vs_invested_diff < 0 %}
+          <div class="text-warning small mt-1">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            ${{ "{:,.2f}".format(recon.dtf_vs_invested_diff|abs) }} added to vehicles without a matching Due To/From withdrawal
+          </div>
+        {% else %}
+          <div class="text-info small mt-1">
+            <i class="bi bi-info-circle me-1"></i>
+            ${{ "{:,.2f}".format(recon.dtf_vs_invested_diff) }} withdrawn from Due To/From but not yet invested
+          </div>
+        {% endif %}
+      {% elif recon.invested_additions > 0 %}
+        <div class="text-success small mt-1"><i class="bi bi-check-circle me-1"></i>Matches Due To/From withdrawals</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% elif recon and not recon.has_dtf %}
+<div class="alert alert-info mb-4 small">
+  <i class="bi bi-info-circle me-1"></i>
+  This pool does not have a Due To/From clearing vehicle.
+  <a href="{{ url_for('pools.add_due_to_from', pool_id=pool.id) }}" class="alert-link"
+     onclick="event.preventDefault(); if(confirm('Add a Due To/From clearing vehicle to this pool?')){ fetch(this.href, {method:'POST', headers:{'X-CSRFToken': '{{ csrf_token() }}'}}).then(()=>location.reload()); }">
+    Add one now
+  </a> to track cash flows before investment.
+</div>
+{% endif %}
+
 <!-- Workflow Guide -->
 <div class="alert alert-light border mb-4">
   <h6 class="fw-bold mb-2"><i class="bi bi-info-circle me-2"></i>Monthly Workflow</h6>
   <ol class="mb-0 small">
-    <li><strong>Enter Activity</strong> — For each vehicle, enter the beginning balance, additions, withdrawals, income, gains, and expenses from the brokerage statement.</li>
+    <li><strong>Record Gifts</strong> — Enter contributions under Funds. Cash goes into the Due To/From vehicle first.</li>
+    <li><strong>Enter Activity</strong> — For each vehicle, enter the beginning balance, additions, withdrawals, income, gains, and expenses from the brokerage statement. When moving cash from Due To/From to a vehicle, record a withdrawal in Due To/From and an addition in the vehicle.</li>
     <li><strong>Approve Activity</strong> — Admin approves each vehicle's numbers are correct.</li>
-    <li><strong>Close Month</strong> — Click "Close Month & Allocate Earnings" above. This calculates the unit price and automatically spreads earnings across all funds in this pool based on each fund's unit ownership.</li>
+    <li><strong>Close Month</strong> — Click "Close Month & Allocate Earnings" above. This calculates the unit price (based on earnings only — new gift cash is excluded) and allocates earnings across all funds based on unit ownership.</li>
   </ol>
 </div>
 
@@ -123,7 +187,10 @@
         {% for v in vehicles %}
         {% set act = activity.get(v.id) %}
         <tr>
-          <td class="fw-semibold">{{ v.name }}</td>
+          <td class="fw-semibold">
+            {{ v.name }}
+            {% if v.is_cash_clearing %}<span class="badge bg-info text-dark ms-1" style="font-size:.65rem">Clearing</span>{% endif %}
+          </td>
           {% if act and not act.is_voided %}
             <td class="text-end text-money">${{ "{:,.2f}".format(act.beginning_balance or 0) }}</td>
             <td class="text-end text-money text-success">${{ "{:,.2f}".format(act.additions or 0) }}</td>

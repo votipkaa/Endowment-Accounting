@@ -171,12 +171,13 @@ class InvestmentPool(db.Model):
 
 class InvestmentVehicle(db.Model):
     __tablename__ = "investment_vehicles"
-    id          = db.Column(db.Integer, primary_key=True)
-    pool_id     = db.Column(db.Integer, db.ForeignKey("investment_pools.id"), nullable=False)
-    name        = db.Column(db.String(150), nullable=False)
-    description = db.Column(db.Text)
-    is_active   = db.Column(db.Boolean, default=True)
-    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    id                = db.Column(db.Integer, primary_key=True)
+    pool_id           = db.Column(db.Integer, db.ForeignKey("investment_pools.id"), nullable=False)
+    name              = db.Column(db.String(150), nullable=False)
+    description       = db.Column(db.Text)
+    is_active         = db.Column(db.Boolean, default=True)
+    is_cash_clearing  = db.Column(db.Boolean, default=False)  # True = "Due To/From" vehicle
+    created_at        = db.Column(db.DateTime, default=datetime.utcnow)
 
     monthly_activity = db.relationship("VehicleMonthlyActivity", backref="vehicle", lazy="dynamic", cascade="all, delete-orphan")
 
